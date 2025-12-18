@@ -10,6 +10,13 @@ export enum ExchangeStep {
   ERROR = 'ERROR'
 }
 
+export enum UserRole {
+  NONE = 'NONE',
+  PAYEE = 'PAYEE',
+  MERCHANT = 'MERCHANT',
+  SELLER = 'SELLER'
+}
+
 export interface NetworkLog {
   id: string;
   timestamp: string;
