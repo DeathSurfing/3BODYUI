@@ -10,10 +10,10 @@ const WalletButton: React.FC<WalletButtonProps> = ({ address, onConnect }) => {
   return (
     <button
       onClick={onConnect}
-      className={`px-4 py-2 rounded-full font-medium transition-all ${
+      className={`px-6 py-2 border font-bold text-xs uppercase tracking-widest transition-all ${
         address 
-          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-          : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
+          ? 'bg-transparent border-white text-white' 
+          : 'bg-white text-black border-white hover:bg-black hover:text-white'
       }`}
     >
       {address 
