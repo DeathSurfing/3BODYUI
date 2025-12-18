@@ -1,0 +1,5 @@
+{
+  "name": "X402 Currency Exchange Protocol",
+  "description": "A demonstration of the HTTP 402 'Payment Required' protocol for decentralized currency exchange, featuring a modular architecture with Payee, Merchant, and Seller roles.",
+  "requestFramePermissions": []
+}
