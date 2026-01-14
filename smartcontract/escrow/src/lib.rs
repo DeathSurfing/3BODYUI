@@ -113,7 +113,7 @@ fn deposit(
     env: Env,
     info: MessageInfo,
     payment_id: String,
-    seller: String,
+    seller: Addr,
 ) -> Result<Response, ContractError> {
     // Payment must not already exist
     if PAYMENTS.may_load(deps.storage, payment_id.as_str())?.is_some() {
