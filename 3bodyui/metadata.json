@@ -1,0 +1,7 @@
+{
+  "name": "3 BODY PAYMENT",
+  "description": "A decentralized tri-party payment exchange system enabling trustless USD to USDT conversion via smart contracts and the HTTP 402 protocol.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
