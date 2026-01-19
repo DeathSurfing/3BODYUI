@@ -1,35 +1,25 @@
-import "./globals.css"
-import type { Metadata } from "next"
-import { Inter, JetBrains_Mono } from "next/font/google"
+import type { Metadata } from 'next';
+import { Inter, JetBrains_Mono } from 'next/font/google';
+import './globals.css';
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap"
-})
-
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  display: "swap"
-})
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains-mono' });
 
 export const metadata: Metadata = {
-  title: "3-BODY PAYMENT PROTOCOL"
-}
+    title: '3 BODY PAYMENT',
+    description: 'Decentralized tri-party settlement protocol',
+};
 
 export default function RootLayout({
-  children
+    children,
 }: {
-  children: React.ReactNode
+    children: React.ReactNode;
 }) {
-  return (
-    <html lang="en">
-      <body
-        className={`${inter.variable} ${mono.variable} bg-black text-white overflow-hidden`}
-      >
-        {children}
-      </body>
-    </html>
-  )
+    return (
+        <html lang="en">
+            <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased text-[#1a1a1a] bg-[#f0f2f58c]`}>
+                {children}
+            </body>
+        </html>
+    );
 }
