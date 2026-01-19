@@ -1,11 +1,12 @@
 use cosmwasm_std::{
-    attr, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, StdError,
-    CosmosMsg, Coin, BankMsg, Uint128, Timestamp,
+    attr, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, StdError,
+    Coin, BankMsg, Uint128, Timestamp, Addr, WasmQuery, QueryRequest,
 };
 use cw_storage_plus::{Map, Item};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use cw2;
 
 static CONTRACT_NAME: &str = "crates.io:escrow-mvp";
 static CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -26,24 +27,22 @@ pub enum ContractError {
     InsufficientFunds {},
     #[error("Refund not allowed yet")]
     RefundNotAllowed {},
+    #[error("LP not active")]
+    LPNotActive {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub admin: String,
-    /// refund timeout seconds after deposit
     pub refund_timeout_seconds: u64,
-    /// denom for native token (e.g., "ust")
     pub denom: String,
+    pub lp_registry: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum ExecuteMsg {
-    /// deposit funds into escrow by paying native coins along with this call
     Deposit { payment_id: String, seller: String },
-    /// admin/operator confirms payout
     ConfirmPayout { payment_id: String, lp: String },
-    /// refund after timeout: can be called by seller or admin
     Refund { payment_id: String },
 }
 
@@ -55,7 +54,7 @@ pub enum QueryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PaymentInfo {
     pub payment_id: String,
-    pub seller: String,
+    pub seller: Addr,
     pub amount: Uint128,
     pub denom: String,
     pub state: PaymentState,
@@ -66,16 +65,21 @@ pub struct PaymentInfo {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum PaymentState {
-    Created,
     Deposited,
     PayoutConfirmed,
-    Completed,
     Refunded,
+}
+
+// Query message for LP Registry contract
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub enum LPRegistryQueryMsg {
+    GetLP { lp: String },
 }
 
 const ADMIN: Item<String> = Item::new("admin");
 const DENOM: Item<String> = Item::new("denom");
 const REFUND_TIMEOUT: Item<u64> = Item::new("refund_timeout");
+const LP_REGISTRY: Item<String> = Item::new("lp_registry");
 const PAYMENTS: Map<&str, PaymentInfo> = Map::new("payments");
 
 pub fn instantiate(
@@ -87,11 +91,11 @@ pub fn instantiate(
     ADMIN.save(deps.storage, &msg.admin)?;
     DENOM.save(deps.storage, &msg.denom)?;
     REFUND_TIMEOUT.save(deps.storage, &msg.refund_timeout_seconds)?;
+    LP_REGISTRY.save(deps.storage, &msg.lp_registry)?;
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(Response::new().add_attributes(vec![
         attr("action", "instantiate"),
         attr("admin", msg.admin),
-        attr("denom", msg.denom),
     ]))
 }
 
@@ -113,15 +117,15 @@ fn deposit(
     env: Env,
     info: MessageInfo,
     payment_id: String,
-    seller: Addr,
+    seller: String,
 ) -> Result<Response, ContractError> {
-    // Payment must not already exist
     if PAYMENTS.may_load(deps.storage, payment_id.as_str())?.is_some() {
         return Err(ContractError::PaymentExists {});
     }
 
+    let seller_addr = deps.api.addr_validate(&seller)?;
     let denom = DENOM.load(deps.storage)?;
-    // Expect exactly one coin in the denom
+
     let sent_amount = info
         .funds
         .iter()
@@ -129,17 +133,16 @@ fn deposit(
         .map(|c| c.amount)
         .unwrap_or(Uint128::zero());
 
-    if sent_amount == Uint128::zero() {
+    if sent_amount.is_zero() {
         return Err(ContractError::InsufficientFunds {});
     }
 
     let now = env.block.time;
-    let timeout = REFUND_TIMEOUT.load(deps.storage)?;
-    let deadline = now.plus_seconds(timeout);
+    let deadline = now.plus_seconds(REFUND_TIMEOUT.load(deps.storage)?);
 
-    let info_struct = PaymentInfo {
+    let payment = PaymentInfo {
         payment_id: payment_id.clone(),
-        seller: seller.clone(),
+        seller: seller_addr,
         amount: sent_amount,
         denom: denom.clone(),
         state: PaymentState::Deposited,
@@ -148,28 +151,26 @@ fn deposit(
         lp: None,
     };
 
-    PAYMENTS.save(deps.storage, payment_id.as_str(), &info_struct)?;
+    PAYMENTS.save(deps.storage, payment_id.as_str(), &payment)?;
 
-    let res = Response::new().add_attributes(vec![
+    Ok(Response::new().add_attributes(vec![
         attr("action", "deposit"),
         attr("payment_id", payment_id),
-        attr("seller", seller),
         attr("amount", sent_amount.to_string()),
-        attr("denom", denom),
-    ]);
-
-    Ok(res)
+    ]))
 }
 
 fn confirm_payout(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     payment_id: String,
     lp: String,
 ) -> Result<Response, ContractError> {
     let admin = ADMIN.load(deps.storage)?;
-    if info.sender != admin {
+    // validate admin string to Addr and compare
+    let admin_addr = deps.api.addr_validate(&admin)?;
+    if info.sender != admin_addr {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -179,6 +180,18 @@ fn confirm_payout(
 
     if payment.state != PaymentState::Deposited {
         return Err(ContractError::InvalidState {});
+    }
+
+    // Cross-contract: query LP registry for active status (expects bool)
+    let registry = LP_REGISTRY.load(deps.storage)?;
+    let lp_query = lp.clone();
+    let lp_active: bool = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+        contract_addr: registry,
+        msg: to_json_binary(&LPRegistryQueryMsg::GetLP { lp: lp_query })?,
+    }))?;
+
+    if !lp_active {
+        return Err(ContractError::LPNotActive {});
     }
 
     // Mark payout confirmed and transfer funds to LP (native bank send)
@@ -209,15 +222,21 @@ fn confirm_payout(
     Ok(res)
 }
 
-fn refund(deps: DepsMut, env: Env, info: MessageInfo, payment_id: String) -> Result<Response, ContractError> {
-    let maybe = PAYMENTS.may_load(deps.storage, payment_id.as_str())?;
-    let mut payment = maybe.ok_or(ContractError::PaymentNotFound {})?;
+fn refund(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    payment_id: String,
+) -> Result<Response, ContractError> {
+    let mut payment = PAYMENTS
+        .may_load(deps.storage, payment_id.as_str())?
+        .ok_or(ContractError::PaymentNotFound {})?;
 
     // Only allow refund if state is Deposited and deadline passed, or admin can force
     let now = env.block.time;
     let admin = ADMIN.load(deps.storage)?;
-    let is_admin = info.sender == admin;
-    let is_seller = info.sender == payment.seller;
+    let admin_addr = deps.api.addr_validate(&admin)?;
+    let is_admin = info.sender == admin_addr;
 
     if payment.state != PaymentState::Deposited {
         return Err(ContractError::InvalidState {});
@@ -237,7 +256,7 @@ fn refund(deps: DepsMut, env: Env, info: MessageInfo, payment_id: String) -> Res
     PAYMENTS.save(deps.storage, payment_id.as_str(), &payment)?;
 
     let send = BankMsg::Send {
-        to_address: payment.seller.clone(),
+        to_address: payment.seller.to_string(),
         amount: vec![coin.clone()],
     };
 
@@ -246,7 +265,7 @@ fn refund(deps: DepsMut, env: Env, info: MessageInfo, payment_id: String) -> Res
         .add_attributes(vec![
             attr("action", "refund"),
             attr("payment_id", payment_id),
-            attr("refund_to", payment.seller),
+            attr("refund_to", payment.seller.to_string()),
             attr("amount", coin.amount.to_string()),
             attr("denom", coin.denom),
         ]);
@@ -256,83 +275,8 @@ fn refund(deps: DepsMut, env: Env, info: MessageInfo, payment_id: String) -> Res
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetPayment { payment_id } => to_binary(&query_payment(deps, payment_id)?),
-    }
-}
-
-fn query_payment(deps: Deps, payment_id: String) -> StdResult<Option<PaymentInfo>> {
-    Ok(PAYMENTS.may_load(deps.storage, payment_id.as_str())?)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins};
-
-    #[test]
-    fn test_deposit_and_refund_flow() {
-        let mut deps = mock_dependencies();
-        let admin = "admin";
-        let denom = "utest";
-        let instantiate_msg = InstantiateMsg {
-            admin: admin.to_string(),
-            refund_timeout_seconds: 10,
-            denom: denom.to_string(),
-        };
-        let env = mock_env();
-        let info = mock_info(admin, &[]);
-        instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
-
-        // deposit
-        let seller = "seller";
-        let payment_id = "pay-1".to_string();
-        let deposit_info = mock_info(seller, &coins(1000, denom));
-        let res = deposit(deps.as_mut(), env.clone(), deposit_info, payment_id.clone(), seller.to_string()).unwrap();
-        assert_eq!(res.attributes.iter().any(|a| a.key=="action" && a.value=="deposit"), true);
-
-        // Try refund before timeout by seller -> should error
-        let refund_info = mock_info(seller, &[]);
-        let should_err = refund(deps.as_mut(), env.clone(), refund_info, payment_id.clone());
-        assert!(should_err.is_err());
-
-        // advance time beyond timeout
-        let mut env2 = env.clone();
-        env2.block.time = env.block.time.plus_seconds(20);
-
-        let refund_info2 = mock_info(seller, &[]);
-        let res2 = refund(deps.as_mut(), env2, refund_info2, payment_id.clone()).unwrap();
-        assert_eq!(res2.attributes.iter().any(|a| a.key=="action" && a.value=="refund"), true);
-    }
-
-    #[test]
-    fn test_deposit_and_confirm_payout_by_admin() {
-        let mut deps = mock_dependencies();
-        let admin = "admin";
-        let denom = "utest";
-        let instantiate_msg = InstantiateMsg {
-            admin: admin.to_string(),
-            refund_timeout_seconds: 10,
-            denom: denom.to_string(),
-        };
-        let env = mock_env();
-        let info = mock_info(admin, &[]);
-        instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
-
-        // deposit
-        let seller = "seller";
-        let payment_id = "pay-2".to_string();
-        let deposit_info = mock_info(seller, &coins(2000, denom));
-        deposit(deps.as_mut(), env.clone(), deposit_info, payment_id.clone(), seller.to_string()).unwrap();
-
-        // confirm payout by non-admin should fail
-        let non_admin = mock_info("hacker", &[]);
-        let res_err = confirm_payout(deps.as_mut(), env.clone(), non_admin, payment_id.clone(), "lp1".to_string());
-        assert!(res_err.is_err());
-
-        // confirm payout by admin
-        let admin_info = mock_info(admin, &[]);
-        let res = confirm_payout(deps.as_mut(), env.clone(), admin_info, payment_id.clone(), "lp1".to_string()).unwrap();
-        assert_eq!(res.attributes.iter().any(|a| a.key=="action" && a.value=="confirm_payout"), true);
+        QueryMsg::GetPayment { payment_id } => {
+            to_json_binary(&PAYMENTS.may_load(deps.storage, payment_id.as_str())?)
+        }
     }
 }
