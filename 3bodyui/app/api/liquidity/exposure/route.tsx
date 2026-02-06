@@ -1,3 +1,6 @@
+import { proxy } from "@/lib/proxy";
+import { internalFetch } from "@/lib/internalFetch";
+
 export async function GET() {
   const data = await proxy(
     async (ctx) => {
