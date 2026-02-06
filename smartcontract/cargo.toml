@@ -1,5 +1,5 @@
 [workspace]
-members = ["escrow", "lp_registry"]
+members = ["escrow", "lp_registry", "atomic_swap"]
 resolver = "2"
 
 [workspace.dependencies]
