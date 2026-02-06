@@ -1,0 +1,93 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "3 Body Payment",
+  "version": "0.0.0",
+  "identifier": "com.threebody.protocol",
+  "build": {
+    "beforeDevCommand": "cd 3bodyui && bun run dev",
+    "beforeBuildCommand": "cd 3bodyui && bun run build",
+    "devUrl": "http://localhost:3000",
+    "frontendDist": "../3bodyui/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "3 Body Payment",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 768,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "transparent": false,
+        "alwaysOnTop": false
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost https:",
+        "img-src": "'self' data: https:",
+        "style-src": "'self' 'unsafe-inline'",
+        "script-src": "'self' 'wasm-unsafe-eval'"
+      },
+      "dangerousDisableAssetCspModification": false,
+      "capabilities": ["default"]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "rpm", "appimage", "dmg", "nsis", "app", "apk", "aab"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Finance",
+    "shortDescription": "Decentralized tri-party settlement protocol",
+    "longDescription": "3 Body Payment is a decentralized tri-party settlement protocol enabling secure USD to USDT exchanges through smart contracts.",
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "signingIdentity": null,
+      "entitlements": null,
+      "exceptionDomain": "",
+      "license": null
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "wix": {
+        "language": ["en-US"]
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    },
+    "android": {
+      "minSdkVersion": 24,
+      "targetSdkVersion": 34
+    },
+    "iOS": {
+      "minimumSystemVersion": "14.0"
+    }
+  },
+  "plugins": {
+    "notification": {
+      "active": true
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [],
+      "dialog": true,
+      "pubkey": "YOUR_UPDATER_SIGNATURE_PUBKEY_HERE"
+    }
+  }
+}
