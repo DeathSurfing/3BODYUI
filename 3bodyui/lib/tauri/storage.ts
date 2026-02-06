@@ -20,13 +20,13 @@
  * import { secureStorage } from '@/lib/tauri/storage';
  * 
  * // Store a value
- * await secureStorage.set('auth_token', 'abc123');
+ * await secureStorage.set('wallet_key', encryptedKey);
  * 
  * // Retrieve a value
- * const token = await secureStorage.get('auth_token');
+ * const key = await secureStorage.get('wallet_key');
  * 
  * // Delete a value
- * await secureStorage.delete('auth_token');
+ * await secureStorage.delete('wallet_key');
  * ```
  */
 
@@ -101,6 +101,28 @@ export const secureStorage = {
     } catch (error) {
       console.error('Failed to delete value:', error);
       throw new Error(`Secure storage delete failed: ${error}`);
+    }
+  },
+
+  /**
+   * Check if a key exists in secure storage
+   * 
+   * @param key - The key to check
+   * @returns Promise resolving to true if key exists, false otherwise
+   * 
+   * @example
+   * ```typescript
+   * if (await secureStorage.has('wallet_key')) {
+   *   console.log('Wallet key exists');
+   * }
+   * ```
+   */
+  async has(key: string): Promise<boolean> {
+    try {
+      const result = await this.get(key);
+      return result !== null;
+    } catch {
+      return false;
     }
   },
 };

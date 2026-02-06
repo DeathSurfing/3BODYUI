@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "identifier": "com.threebody.protocol",
   "build": {
-    "beforeDevCommand": "cd 3bodyui && bun run dev",
-    "beforeBuildCommand": "cd 3bodyui && bun run build",
+    "beforeDevCommand": "cd ../3bodyui && bun run dev",
+    "beforeBuildCommand": "cd ../3bodyui && bun run build",
     "devUrl": "http://localhost:3000",
     "frontendDist": "../3bodyui/dist"
   },
@@ -39,14 +39,8 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "rpm", "appimage", "dmg", "nsis", "app", "apk", "aab"],
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ],
+    "targets": "all",
+
     "category": "Finance",
     "shortDescription": "Decentralized tri-party settlement protocol",
     "longDescription": "3 Body Payment is a decentralized tri-party settlement protocol enabling secure USD to USDT exchanges through smart contracts.",
@@ -55,8 +49,7 @@
       "minimumSystemVersion": "10.13",
       "signingIdentity": null,
       "entitlements": null,
-      "exceptionDomain": "",
-      "license": null
+      "exceptionDomain": ""
     },
     "windows": {
       "certificateThumbprint": null,
@@ -70,13 +63,6 @@
       "deb": {
         "depends": []
       }
-    },
-    "android": {
-      "minSdkVersion": 24,
-      "targetSdkVersion": 34
-    },
-    "iOS": {
-      "minimumSystemVersion": "14.0"
     }
   },
   "plugins": {

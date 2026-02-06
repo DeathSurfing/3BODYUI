@@ -3,8 +3,7 @@
   "bundle": {
     "android": {
       "minSdkVersion": 24,
-      "targetSdkVersion": 34,
-      "packageName": "com.threebody.protocol"
+      "targetSdkVersion": 34
     }
   }
 }

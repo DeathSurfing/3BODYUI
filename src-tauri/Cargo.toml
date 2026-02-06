@@ -8,14 +8,6 @@ repository = "https://github.com/yourusername/3BODYUI"
 edition = "2021"
 rust-version = "1.77.2"
 
-[lib]
-name = "three_body_payment_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
-
-[[bin]]
-name = "three-body-payment"
-path = "src/main.rs"
-
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -27,6 +19,8 @@ tauri-plugin-fs = "2"
 tauri-plugin-os = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Cross-platform secure storage using native keychain/keystore
+keyring = { version = "3", features = ["linux-native", "apple-native", "windows-native"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
