@@ -4341,6 +4341,7 @@ name = "three-body-payment"
 version = "0.0.0"
 dependencies = [
  "keyring",
+ "open",
  "serde",
  "serde_json",
  "tauri",

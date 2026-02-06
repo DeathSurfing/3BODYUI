@@ -1,7 +1,7 @@
 // Prevents additional console window on Windows in release mode
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use keyring::Entry;
 
 const APP_SERVICE_NAME: &str = "com.threebody.protocol";
