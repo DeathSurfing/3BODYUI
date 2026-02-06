@@ -1,12 +1,13 @@
+use cosmwasm_schema::QueryResponses;
 use cosmwasm_std::{
-    attr, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, StdError,
-    BankMsg, Coin, Uint128, OverflowError,
+    attr, to_json_binary, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, OverflowError,
+    Response, StdError, StdResult, Uint128,
 };
-use cw_storage_plus::{Map, Item};
+use cw2;
+use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use cw2;
 
 static CONTRACT_NAME: &str = "crates.io:lp-registry-mvp";
 static CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -40,8 +41,9 @@ pub enum ExecuteMsg {
     Slash { lp: String, amount: Uint128 },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, QueryResponses)]
 pub enum QueryMsg {
+    #[returns(bool)]
     GetLP { lp: String },
 }
 
@@ -81,9 +83,19 @@ pub fn execute(
     }
 }
 
-fn stake(deps: DepsMut, _env: Env, info: MessageInfo, lp: String) -> Result<Response, ContractError> {
+fn stake(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    lp: String,
+) -> Result<Response, ContractError> {
     let denom = DENOM.load(deps.storage)?;
-    let sent = info.funds.iter().find(|c| c.denom == denom).map(|c| c.amount).unwrap_or_default();
+    let sent = info
+        .funds
+        .iter()
+        .find(|c| c.denom == denom)
+        .map(|c| c.amount)
+        .unwrap_or_default();
 
     if sent.is_zero() {
         return Err(ContractError::InsufficientFunds {});
@@ -115,9 +127,13 @@ fn unstake(
         return Err(ContractError::Unauthorized {});
     }
 
-    let mut lpinfo = LPS.may_load(deps.storage, lp.as_str())?.ok_or(ContractError::LPNotFound {})?;
+    let mut lpinfo = LPS
+        .may_load(deps.storage, lp.as_str())?
+        .ok_or(ContractError::LPNotFound {})?;
     if lpinfo.stake < amount {
-        return Err(ContractError::Std(StdError::generic_err("Not enough stake")));
+        return Err(ContractError::Std(StdError::generic_err(
+            "Not enough stake",
+        )));
     }
     lpinfo.stake = lpinfo.stake.checked_sub(amount)?;
     LPS.save(deps.storage, lp.as_str(), &lpinfo)?;
@@ -131,19 +147,29 @@ fn unstake(
         amount: vec![coin.clone()],
     };
 
-    Ok(Response::new()
-        .add_message(msg)
-        .add_attributes(vec![attr("action", "unstake"), attr("lp", lpinfo.lp), attr("amount", amount.to_string())]))
+    Ok(Response::new().add_message(msg).add_attributes(vec![
+        attr("action", "unstake"),
+        attr("lp", lpinfo.lp),
+        attr("amount", amount.to_string()),
+    ]))
 }
 
-fn slash(deps: DepsMut, _env: Env, info: MessageInfo, lp: String, amount: Uint128) -> Result<Response, ContractError> {
+fn slash(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    lp: String,
+    amount: Uint128,
+) -> Result<Response, ContractError> {
     let admin = ADMIN.load(deps.storage)?;
     let admin_addr = deps.api.addr_validate(&admin)?;
     if info.sender != admin_addr {
         return Err(ContractError::Unauthorized {});
     }
 
-    let mut lpinfo = LPS.may_load(deps.storage, lp.as_str())?.ok_or(ContractError::LPNotFound {})?;
+    let mut lpinfo = LPS
+        .may_load(deps.storage, lp.as_str())?
+        .ok_or(ContractError::LPNotFound {})?;
     if lpinfo.stake < amount {
         // set to zero
         lpinfo.stake = Uint128::zero();
@@ -156,14 +182,261 @@ fn slash(deps: DepsMut, _env: Env, info: MessageInfo, lp: String, amount: Uint12
     }
     LPS.save(deps.storage, lp.as_str(), &lpinfo)?;
 
-    Ok(Response::new().add_attributes(vec![attr("action", "slash"), attr("lp", lp), attr("amount", amount.to_string())]))
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "slash"),
+        attr("lp", lp),
+        attr("amount", amount.to_string()),
+    ]))
 }
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetLP { lp } => {
-            let active = LPS.may_load(deps.storage, lp.as_str())?.map(|l| l.active).unwrap_or(false);
+            let active = LPS
+                .may_load(deps.storage, lp.as_str())?
+                .map(|l| l.active)
+                .unwrap_or(false);
             to_json_binary(&active)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cosmwasm_std::testing::{
+        mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+    };
+    use cosmwasm_std::{coins, from_json, Empty, OwnedDeps};
+
+    fn setup_contract() -> (
+        OwnedDeps<MockStorage, MockApi, MockQuerier, Empty>,
+        Env,
+        MessageInfo,
+    ) {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let admin = "admin".to_string();
+        let info = mock_info(&admin, &[]);
+
+        let msg = InstantiateMsg {
+            admin: admin.clone(),
+            denom: "uusd".to_string(),
+        };
+
+        instantiate(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        (deps, env, info)
+    }
+
+    #[test]
+    fn test_instantiate() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let admin = "admin".to_string();
+        let info = mock_info(&admin, &[]);
+
+        let msg = InstantiateMsg {
+            admin: admin.clone(),
+            denom: "uusd".to_string(),
+        };
+
+        let res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+        assert_eq!(res.attributes.len(), 1);
+        assert_eq!(res.attributes[0].key, "action");
+        assert_eq!(res.attributes[0].value, "instantiate");
+    }
+
+    #[test]
+    fn test_stake_new_lp() {
+        let (mut deps, env, _info) = setup_contract();
+        let lp = "lp1".to_string();
+        let stake_amount = 1000u128;
+
+        let info = mock_info(&lp, &coins(stake_amount, "uusd"));
+        let msg = ExecuteMsg::Stake { lp: lp.clone() };
+
+        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        assert_eq!(res.attributes.len(), 1);
+        assert_eq!(res.attributes[0].key, "action");
+        assert_eq!(res.attributes[0].value, "stake");
+
+        // Verify LP is active
+        let query_msg = QueryMsg::GetLP { lp: lp.clone() };
+        let active: bool = from_json(&query(deps.as_ref(), env, query_msg).unwrap()).unwrap();
+        assert!(active);
+    }
+
+    #[test]
+    fn test_stake_existing_lp() {
+        let (mut deps, env, _info) = setup_contract();
+        let lp = "lp1".to_string();
+
+        // First stake
+        let info = mock_info(&lp, &coins(1000, "uusd"));
+        let msg = ExecuteMsg::Stake { lp: lp.clone() };
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // Second stake
+        let info = mock_info(&lp, &coins(500, "uusd"));
+        let msg = ExecuteMsg::Stake { lp: lp.clone() };
+        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        assert_eq!(res.attributes[0].value, "stake");
+    }
+
+    #[test]
+    fn test_stake_insufficient_funds() {
+        let (mut deps, env, _info) = setup_contract();
+        let lp = "lp1".to_string();
+
+        let info = mock_info(&lp, &[]);
+        let msg = ExecuteMsg::Stake { lp: lp.clone() };
+
+        let res = execute(deps.as_mut(), env, info, msg);
+        assert!(res.is_err());
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::InsufficientFunds {}
+        ));
+    }
+
+    #[test]
+    fn test_unstake() {
+        let (mut deps, env, _info) = setup_contract();
+        let lp = "lp1".to_string();
+
+        // Stake first
+        let info = mock_info(&lp, &coins(1000, "uusd"));
+        let msg = ExecuteMsg::Stake { lp: lp.clone() };
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // Unstake
+        let info = mock_info(&lp, &[]);
+        let msg = ExecuteMsg::Unstake {
+            lp: lp.clone(),
+            amount: Uint128::new(500),
+        };
+
+        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        assert_eq!(res.attributes.len(), 3);
+        assert_eq!(res.attributes[0].value, "unstake");
+    }
+
+    #[test]
+    fn test_unstake_unauthorized() {
+        let (mut deps, env, _info) = setup_contract();
+        let lp = "lp1".to_string();
+        let attacker = "attacker".to_string();
+
+        // Stake first
+        let info = mock_info(&lp, &coins(1000, "uusd"));
+        let msg = ExecuteMsg::Stake { lp: lp.clone() };
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // Try to unstake from different address
+        let info = mock_info(&attacker, &[]);
+        let msg = ExecuteMsg::Unstake {
+            lp: lp.clone(),
+            amount: Uint128::new(500),
+        };
+
+        let res = execute(deps.as_mut(), env, info, msg);
+        assert!(res.is_err());
+        assert!(matches!(res.unwrap_err(), ContractError::Unauthorized {}));
+    }
+
+    #[test]
+    fn test_unstake_not_found() {
+        let (mut deps, env, _info) = setup_contract();
+        let lp = "lp1".to_string();
+
+        let info = mock_info(&lp, &[]);
+        let msg = ExecuteMsg::Unstake {
+            lp: lp.clone(),
+            amount: Uint128::new(500),
+        };
+
+        let res = execute(deps.as_mut(), env, info, msg);
+        assert!(res.is_err());
+        assert!(matches!(res.unwrap_err(), ContractError::LPNotFound {}));
+    }
+
+    #[test]
+    fn test_slash() {
+        let (mut deps, env, info) = setup_contract();
+        let lp = "lp1".to_string();
+
+        // Stake first
+        let stake_info = mock_info(&lp, &coins(1000, "uusd"));
+        let msg = ExecuteMsg::Stake { lp: lp.clone() };
+        execute(deps.as_mut(), env.clone(), stake_info, msg).unwrap();
+
+        // Slash by admin
+        let msg = ExecuteMsg::Slash {
+            lp: lp.clone(),
+            amount: Uint128::new(300),
+        };
+
+        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        assert_eq!(res.attributes[0].value, "slash");
+        assert_eq!(res.attributes[1].value, lp);
+        assert_eq!(res.attributes[2].value, "300");
+    }
+
+    #[test]
+    fn test_slash_unauthorized() {
+        let (mut deps, env, _admin_info) = setup_contract();
+        let lp = "lp1".to_string();
+        let attacker = "attacker".to_string();
+
+        // Stake first
+        let stake_info = mock_info(&lp, &coins(1000, "uusd"));
+        let msg = ExecuteMsg::Stake { lp: lp.clone() };
+        execute(deps.as_mut(), env.clone(), stake_info, msg).unwrap();
+
+        // Try to slash from non-admin address
+        let attacker_info = mock_info(&attacker, &[]);
+        let msg = ExecuteMsg::Slash {
+            lp: lp.clone(),
+            amount: Uint128::new(300),
+        };
+
+        let res = execute(deps.as_mut(), env, attacker_info, msg);
+        assert!(res.is_err());
+        assert!(matches!(res.unwrap_err(), ContractError::Unauthorized {}));
+    }
+
+    #[test]
+    fn test_slash_to_zero_deactivates() {
+        let (mut deps, env, info) = setup_contract();
+        let lp = "lp1".to_string();
+
+        // Stake
+        let stake_info = mock_info(&lp, &coins(1000, "uusd"));
+        let msg = ExecuteMsg::Stake { lp: lp.clone() };
+        execute(deps.as_mut(), env.clone(), stake_info, msg).unwrap();
+
+        // Slash more than staked
+        let msg = ExecuteMsg::Slash {
+            lp: lp.clone(),
+            amount: Uint128::new(1500),
+        };
+
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // Verify LP is now inactive
+        let query_msg = QueryMsg::GetLP { lp: lp.clone() };
+        let active: bool = from_json(&query(deps.as_ref(), env, query_msg).unwrap()).unwrap();
+        assert!(!active);
+    }
+
+    #[test]
+    fn test_query_nonexistent_lp() {
+        let (deps, env, _info) = setup_contract();
+        let lp = "nonexistent".to_string();
+
+        let query_msg = QueryMsg::GetLP { lp: lp.clone() };
+        let active: bool = from_json(&query(deps.as_ref(), env, query_msg).unwrap()).unwrap();
+        assert!(!active);
     }
 }

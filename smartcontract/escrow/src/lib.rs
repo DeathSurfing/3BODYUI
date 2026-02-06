@@ -1,12 +1,13 @@
+use cosmwasm_schema::QueryResponses;
 use cosmwasm_std::{
-    attr, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, StdError,
-    Coin, BankMsg, Uint128, Timestamp, Addr, WasmQuery, QueryRequest,
+    attr, to_json_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo,
+    QueryRequest, Response, StdError, StdResult, Timestamp, Uint128, WasmQuery,
 };
-use cw_storage_plus::{Map, Item};
+use cw2;
+use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use cw2;
 
 static CONTRACT_NAME: &str = "crates.io:escrow-mvp";
 static CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -46,8 +47,9 @@ pub enum ExecuteMsg {
     Refund { payment_id: String },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, QueryResponses)]
 pub enum QueryMsg {
+    #[returns(PaymentInfo)]
     GetPayment { payment_id: String },
 }
 
@@ -107,7 +109,9 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Deposit { payment_id, seller } => deposit(deps, env, info, payment_id, seller),
-        ExecuteMsg::ConfirmPayout { payment_id, lp } => confirm_payout(deps, env, info, payment_id, lp),
+        ExecuteMsg::ConfirmPayout { payment_id, lp } => {
+            confirm_payout(deps, env, info, payment_id, lp)
+        }
         ExecuteMsg::Refund { payment_id } => refund(deps, env, info, payment_id),
     }
 }
@@ -119,7 +123,10 @@ fn deposit(
     payment_id: String,
     seller: String,
 ) -> Result<Response, ContractError> {
-    if PAYMENTS.may_load(deps.storage, payment_id.as_str())?.is_some() {
+    if PAYMENTS
+        .may_load(deps.storage, payment_id.as_str())?
+        .is_some()
+    {
         return Err(ContractError::PaymentExists {});
     }
 
@@ -209,15 +216,13 @@ fn confirm_payout(
         amount: vec![coin.clone()],
     };
 
-    let res = Response::new()
-        .add_message(send)
-        .add_attributes(vec![
-            attr("action", "confirm_payout"),
-            attr("payment_id", payment_id.clone()),
-            attr("lp", lp),
-            attr("amount", coin.amount.to_string()),
-            attr("denom", coin.denom),
-        ]);
+    let res = Response::new().add_message(send).add_attributes(vec![
+        attr("action", "confirm_payout"),
+        attr("payment_id", payment_id.clone()),
+        attr("lp", lp),
+        attr("amount", coin.amount.to_string()),
+        attr("denom", coin.denom),
+    ]);
 
     Ok(res)
 }
@@ -260,15 +265,13 @@ fn refund(
         amount: vec![coin.clone()],
     };
 
-    let res = Response::new()
-        .add_message(send)
-        .add_attributes(vec![
-            attr("action", "refund"),
-            attr("payment_id", payment_id),
-            attr("refund_to", payment.seller.to_string()),
-            attr("amount", coin.amount.to_string()),
-            attr("denom", coin.denom),
-        ]);
+    let res = Response::new().add_message(send).add_attributes(vec![
+        attr("action", "refund"),
+        attr("payment_id", payment_id),
+        attr("refund_to", payment.seller.to_string()),
+        attr("amount", coin.amount.to_string()),
+        attr("denom", coin.denom),
+    ]);
 
     Ok(res)
 }
@@ -278,5 +281,229 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetPayment { payment_id } => {
             to_json_binary(&PAYMENTS.may_load(deps.storage, payment_id.as_str())?)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cosmwasm_std::testing::{
+        mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+    };
+    use cosmwasm_std::{coins, from_json, Addr, Empty, OwnedDeps, Uint128};
+
+    fn setup_contract() -> (
+        OwnedDeps<MockStorage, MockApi, MockQuerier, Empty>,
+        Env,
+        MessageInfo,
+        String,
+    ) {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let admin = "admin".to_string();
+        let info = mock_info(&admin, &[]);
+        let lp_registry = "lp_registry".to_string();
+
+        let msg = InstantiateMsg {
+            admin: admin.clone(),
+            refund_timeout_seconds: 3600, // 1 hour
+            denom: "uusd".to_string(),
+            lp_registry: lp_registry.clone(),
+        };
+
+        instantiate(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        (deps, env, info, lp_registry)
+    }
+
+    #[test]
+    fn test_instantiate() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let admin = "admin".to_string();
+        let info = mock_info(&admin, &[]);
+
+        let msg = InstantiateMsg {
+            admin: admin.clone(),
+            refund_timeout_seconds: 3600,
+            denom: "uusd".to_string(),
+            lp_registry: "lp_registry".to_string(),
+        };
+
+        let res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+        assert_eq!(res.attributes.len(), 2);
+        assert_eq!(res.attributes[0].key, "action");
+        assert_eq!(res.attributes[0].value, "instantiate");
+    }
+
+    #[test]
+    fn test_deposit() {
+        let (mut deps, env, _info, _lp_registry) = setup_contract();
+        let buyer = "buyer".to_string();
+        let seller = "seller".to_string();
+        let payment_id = "payment_1".to_string();
+        let deposit_amount = 1000u128;
+
+        let info = mock_info(&buyer, &coins(deposit_amount, "uusd"));
+        let msg = ExecuteMsg::Deposit {
+            payment_id: payment_id.clone(),
+            seller: seller.clone(),
+        };
+
+        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        assert_eq!(res.attributes.len(), 3);
+        assert_eq!(res.attributes[0].value, "deposit");
+        assert_eq!(res.attributes[1].value, payment_id);
+        assert_eq!(res.attributes[2].value, deposit_amount.to_string());
+
+        // Verify payment was stored
+        let query_msg = QueryMsg::GetPayment {
+            payment_id: payment_id.clone(),
+        };
+        let payment: Option<PaymentInfo> =
+            from_json(&query(deps.as_ref(), env, query_msg).unwrap()).unwrap();
+
+        assert!(payment.is_some());
+        let payment = payment.unwrap();
+        assert_eq!(payment.seller, Addr::unchecked(&seller));
+        assert_eq!(payment.amount, Uint128::new(deposit_amount));
+        assert_eq!(payment.state, PaymentState::Deposited);
+    }
+
+    #[test]
+    fn test_deposit_duplicate_payment_id() {
+        let (mut deps, env, _info, _lp_registry) = setup_contract();
+        let buyer = "buyer".to_string();
+        let seller = "seller".to_string();
+        let payment_id = "payment_1".to_string();
+        let deposit_amount = 1000u128;
+
+        // First deposit
+        let info = mock_info(&buyer, &coins(deposit_amount, "uusd"));
+        let msg = ExecuteMsg::Deposit {
+            payment_id: payment_id.clone(),
+            seller: seller.clone(),
+        };
+        execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // Second deposit with same payment_id should fail
+        let msg = ExecuteMsg::Deposit {
+            payment_id: payment_id.clone(),
+            seller: seller.clone(),
+        };
+        let res = execute(deps.as_mut(), env, info, msg);
+        assert!(res.is_err());
+        assert!(matches!(res.unwrap_err(), ContractError::PaymentExists {}));
+    }
+
+    #[test]
+    fn test_deposit_insufficient_funds() {
+        let (mut deps, env, _info, _lp_registry) = setup_contract();
+        let buyer = "buyer".to_string();
+        let seller = "seller".to_string();
+        let payment_id = "payment_1".to_string();
+
+        // No funds sent
+        let info = mock_info(&buyer, &[]);
+        let msg = ExecuteMsg::Deposit {
+            payment_id: payment_id.clone(),
+            seller: seller.clone(),
+        };
+
+        let res = execute(deps.as_mut(), env, info, msg);
+        assert!(res.is_err());
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::InsufficientFunds {}
+        ));
+    }
+
+    #[test]
+    fn test_refund() {
+        let (mut deps, env, _info, _lp_registry) = setup_contract();
+        let buyer = "buyer".to_string();
+        let seller = "seller".to_string();
+        let payment_id = "payment_1".to_string();
+        let deposit_amount = 1000u128;
+
+        // Deposit first
+        let info = mock_info(&buyer, &coins(deposit_amount, "uusd"));
+        let msg = ExecuteMsg::Deposit {
+            payment_id: payment_id.clone(),
+            seller: seller.clone(),
+        };
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // Advance time past refund deadline
+        let mut env = env;
+        env.block.time = env.block.time.plus_seconds(3601);
+
+        // Refund by anyone after deadline
+        let refund_info = mock_info(&buyer, &[]);
+        let msg = ExecuteMsg::Refund {
+            payment_id: payment_id.clone(),
+        };
+
+        let res = execute(deps.as_mut(), env.clone(), refund_info, msg).unwrap();
+        assert_eq!(res.attributes[0].value, "refund");
+        assert_eq!(res.attributes[1].value, payment_id);
+        assert_eq!(res.attributes[3].value, deposit_amount.to_string());
+
+        // Verify payment state
+        let query_msg = QueryMsg::GetPayment {
+            payment_id: payment_id.clone(),
+        };
+        let payment: Option<PaymentInfo> =
+            from_json(&query(deps.as_ref(), env, query_msg).unwrap()).unwrap();
+
+        assert_eq!(payment.unwrap().state, PaymentState::Refunded);
+    }
+
+    #[test]
+    fn test_refund_too_early() {
+        let (mut deps, env, _info, _lp_registry) = setup_contract();
+        let buyer = "buyer".to_string();
+        let seller = "seller".to_string();
+        let payment_id = "payment_1".to_string();
+
+        // Deposit first
+        let info = mock_info(&buyer, &coins(1000, "uusd"));
+        let msg = ExecuteMsg::Deposit {
+            payment_id: payment_id.clone(),
+            seller: seller.clone(),
+        };
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // Try to refund immediately (before deadline)
+        let refund_info = mock_info(&buyer, &[]);
+        let msg = ExecuteMsg::Refund {
+            payment_id: payment_id.clone(),
+        };
+
+        let res = execute(deps.as_mut(), env, refund_info, msg);
+        assert!(res.is_err());
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::RefundNotAllowed {}
+        ));
+    }
+
+    #[test]
+    fn test_refund_nonexistent_payment() {
+        let (mut deps, env, _info, _lp_registry) = setup_contract();
+        let buyer = "buyer".to_string();
+        let payment_id = "nonexistent".to_string();
+
+        let info = mock_info(&buyer, &[]);
+        let msg = ExecuteMsg::Refund {
+            payment_id: payment_id.clone(),
+        };
+
+        let res = execute(deps.as_mut(), env, info, msg);
+        assert!(res.is_err());
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::PaymentNotFound {}
+        ));
     }
 }

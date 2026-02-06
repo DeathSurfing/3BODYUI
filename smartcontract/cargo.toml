@@ -11,6 +11,10 @@ schemars = "0.8"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 thiserror = "1.0"
 
+# Dev dependencies for testing
+cosmwasm-vm = "1.5.0"
+cw-multi-test = "0.20.0"
+
 [profile.release]
 opt-level = 3
 debug = false

@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  wasmd:
+    image: cosmwasm/wasmd:v0.50.0
+    container_name: 3body-wasmd
+    ports:
+      - "26657:26657"
+      - "1317:1317"
+      - "9090:9090"
+    environment:
+      - MONIKER=3body-local
+      - CHAIN_ID=3body-local
+      - DENOM=u3body
+    volumes:
+      - wasmd-data:/root/.wasmd
+    command: >
+      sh -c "
+        wasmd init 3body-local --chain-id 3body-local --home /root/.wasmd &&
+        wasmd keys add validator --keyring-backend test --home /root/.wasmd &&
+        wasmd add-genesis-account validator 1000000000000u3body --keyring-backend test --home /root/.wasmd &&
+        wasmd gentx validator 1000000000u3body --chain-id 3body-local --keyring-backend test --home /root/.wasmd &&
+        wasmd collect-gentxs --home /root/.wasmd &&
+        sed -i 's/stake/u3body/g' /root/.wasmd/config/genesis.json &&
+        sed -i 's/\"minimum_gas_prices\": \"\"/\"minimum_gas_prices\": \"0u3body\"/g' /root/.wasmd/config/app.toml &&
+        sed -i 's/cors_allowed_origins = \[\]/cors_allowed_origins = [\"*\"]/g' /root/.wasmd/config/config.toml &&
+        sed -i 's/laddr = \"tcp:\/\/127.0.0.1:26657\"/laddr = \"tcp:\/\/0.0.0.0:26657\"/g' /root/.wasmd/config/config.toml &&
+        wasmd start --home /root/.wasmd --rpc.laddr tcp://0.0.0.0:26657
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:26657/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+volumes:
+  wasmd-data:

@@ -1,11 +1,14 @@
 [package]
 name = "escrow"
 version = "0.1.0"
-authors = ["Your Name "]
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "schema_escrow"
+path = "src/bin/schema.rs"
 
 [dependencies]
 cosmwasm-std = { workspace = true }
@@ -18,3 +21,4 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 cosmwasm-schema = { workspace = true }
+cw-multi-test = { workspace = true }
