@@ -82,8 +82,9 @@ fn secure_delete(key: String) -> Result<(), String> {
     let entry = Entry::new(APP_SERVICE_NAME, &key)
         .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
     
-    entry.delete_password()
-        .map_err(|e| format!("Failed to delete password: {}", e))?;
+    // Delete credential using keyring API
+    entry.delete_credential()
+        .map_err(|e| format!("Failed to delete credential: {}", e))?;
     
     println!("[Secure Storage] Successfully deleted key: {}", key);
     Ok(())
@@ -99,28 +100,12 @@ fn secure_delete(key: String) -> Result<(), String> {
 /// * `Ok(())` on success
 /// * `Err(String)` with error message on failure
 #[tauri::command]
-async fn show_notification(title: String, body: String) -> Result<(), String> {
+fn show_notification(title: String, body: String) -> Result<(), String> {
     println!("[Notification] Showing: {} - {}", title, body);
     
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    {
-        use tauri_plugin_notification::NotificationExt;
-        
-        let app_handle = tauri::Manager::app_handle(
-            &tauri::Builder::default().build(tauri::generate_context!())
-                .map_err(|e| format!("Failed to build app: {}", e))?
-        );
-        
-        app_handle.notification()
-            .builder()
-            .title(title)
-            .body(body)
-            .show()
-            .map_err(|e| format!("Failed to show notification: {}", e))?;
-    }
-    
-    // For mobile, notifications require additional setup (APNs for iOS, FCM for Android)
-    // This will be implemented when mobile notification support is configured
+    // TODO: Implement actual notifications for each platform
+    // Desktop notifications require additional setup
+    // Mobile notifications require APNs (iOS) or FCM (Android) configuration
     
     Ok(())
 }
@@ -148,8 +133,8 @@ async fn open_external_url(url: String) -> Result<(), String> {
         return Err("URL must start with http:// or https://".to_string());
     }
     
-    // Use the shell plugin to open the URL
-    tauri_plugin_shell::Shell::open(&tauri_plugin_shell::Shell::new(), &url, None)
+    // Open URL using the opener crate (via shell plugin)
+    open::that(&url)
         .map_err(|e| format!("Failed to open URL: {}", e))?;
     
     println!("[Shell] Successfully opened URL: {}", url);
@@ -164,9 +149,9 @@ async fn open_external_url(url: String) -> Result<(), String> {
 /// * Path string to the app data directory
 #[tauri::command]
 fn get_app_data_dir(app_handle: AppHandle) -> Result<String, String> {
-    let path = app_handle.path_resolver()
+    let path = app_handle.path()
         .app_data_dir()
-        .ok_or("Could not resolve app data directory")?;
+        .map_err(|e| format!("Could not resolve app data directory: {}", e))?;
     
     Ok(path.to_string_lossy().to_string())
 }
