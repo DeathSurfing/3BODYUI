@@ -7,10 +7,22 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    
+    "tauri": "tauri",
+    
+    "tauri:dev": "tauri dev",
+    "tauri:dev:ios": "tauri ios dev",
+    "tauri:dev:android": "tauri android dev",
+    
+    "tauri:build": "tauri build",
+    "tauri:build:ios": "tauri ios build",
+    "tauri:build:android": "tauri android build"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.18",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-shell": "^2.0.0",
     "@workos-inc/node": "^8.2.0",
     "autoprefixer": "^10.4.24",
     "next": "^16.1.6",
@@ -22,6 +34,7 @@
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
     "@types/node": "^22.19.9",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
