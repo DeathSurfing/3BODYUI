@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import Webcam from 'react-webcam';
+import QrScanner from 'qr-scanner';
 
 interface QRScannerProps {
   isOpen: boolean;
@@ -10,183 +11,64 @@ interface QRScannerProps {
 }
 
 export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan }) => {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const isStoppingRef = useRef(false);
+  const webcamRef = useRef<Webcam>(null);
+  const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(false);
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Suppress non-critical scanner errors
-  const suppressScannerErrors = (err: any) => {
-    const errorStr = String(err);
-    // These are expected errors during cleanup, not actual failures
-    if (
-      errorStr.includes('onabort') ||
-      errorStr.includes('RenderedCameraImpl') ||
-      errorStr.includes('transition') ||
-      errorStr.includes('clear while scan is ongoing') ||
-      errorStr.includes('not running')
-    ) {
-      console.log('Suppressed expected scanner error:', errorStr);
-      return true;
+  const stopScanning = useCallback(() => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
     }
-    return false;
-  };
-
-  // Cleanup function that FORCEFULLY stops the camera
-  const stopCamera = useCallback(async () => {
-    if (isStoppingRef.current) {
-      console.log('Already stopping camera, waiting...');
-      return;
-    }
-    
-    isStoppingRef.current = true;
-    console.log('Stopping camera...');
-    
-    if (scannerRef.current) {
-      try {
-        // Try to stop gracefully first
-        await scannerRef.current.stop();
-        console.log('Camera stopped successfully');
-      } catch (err) {
-        if (!suppressScannerErrors(err)) {
-          console.log('Error stopping camera:', err);
-        }
-      }
-      
-      try {
-        // Also try to clear the scanner
-        await scannerRef.current.clear();
-        console.log('Scanner cleared');
-      } catch (err) {
-        if (!suppressScannerErrors(err)) {
-          console.log('Error clearing scanner:', err);
-        }
-      }
-      
-      // Null out the reference
-      scannerRef.current = null;
-    }
-    
-    // As a fallback, try to stop all tracks on all video elements
-    const videos = document.querySelectorAll('video');
-    videos.forEach(video => {
-      if (video.srcObject) {
-        const stream = video.srcObject as MediaStream;
-        const tracks = stream.getTracks();
-        tracks.forEach(track => {
-          console.log('Stopping track:', track.kind);
-          track.stop();
-        });
-        video.srcObject = null;
-      }
-    });
-
-    isStoppingRef.current = false;
+    setIsScanning(false);
   }, []);
 
-  // Handle close button
-  const handleClose = useCallback(async () => {
-    console.log('Close button clicked');
-    setIsLoading(true);
-    await stopCamera();
-    setIsLoading(false);
+  const handleClose = useCallback(() => {
+    stopScanning();
     onClose();
-  }, [stopCamera, onClose]);
+  }, [stopScanning, onClose]);
 
-  // Initialize scanner
+  const scanQRCode = useCallback(async () => {
+    const webcam = webcamRef.current;
+    if (!webcam || !webcam.video) return;
+
+    const video = webcam.video;
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+
+    try {
+      const result = await QrScanner.scanImage(video);
+      if (result && result.data) {
+        stopScanning();
+        onScan(result.data);
+        handleClose();
+      }
+    } catch {
+      // No QR code found - this is normal, just continue scanning
+    }
+  }, [onScan, handleClose, stopScanning]);
+
   useEffect(() => {
     if (!isOpen) {
-      // Clean up when modal closes
-      stopCamera();
+      stopScanning();
       return;
     }
 
-    let isMounted = true;
-    setError('');
-    setIsLoading(true);
-
-    const initScanner = async () => {
-      // Wait for DOM element
-      const element = document.getElementById('qr-reader');
-      if (!element) {
-        console.log('Element not found, retrying...');
-        setTimeout(initScanner, 100);
-        return;
-      }
-
-      try {
-        // Create scanner
-        scannerRef.current = new Html5Qrcode('qr-reader');
-        
-        if (!isMounted) {
-          await stopCamera();
-          return;
-        }
-
-        // Start scanning
-        await scannerRef.current.start(
-          { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-          },
-          (decodedText) => {
-            console.log('QR Code scanned:', decodedText);
-            if (isMounted) {
-              onScan(decodedText);
-              handleClose();
-            }
-          },
-          (err) => {
-            // QR scan errors - suppress expected ones
-            if (!suppressScannerErrors(err)) {
-              console.log('QR scan error:', err);
-            }
-          }
-        );
-
-        if (isMounted) {
-          setIsLoading(false);
-        } else {
-          await stopCamera();
-        }
-      } catch (err: any) {
-        if (!suppressScannerErrors(err)) {
-          console.error('Init error:', err);
-        }
-        if (isMounted) {
-          // Only show user-friendly errors, not internal scanner errors
-          if (!suppressScannerErrors(err)) {
-            setError(err?.message || 'Camera access denied');
-          }
-          setIsLoading(false);
-        }
-        await stopCamera();
-      }
-    };
-
-    // Small delay to ensure modal is rendered
-    const timer = setTimeout(initScanner, 300);
+    // Start scanning after a short delay to let camera initialize
+    const timer = setTimeout(() => {
+      setIsScanning(true);
+      scanIntervalRef.current = setInterval(scanQRCode, 200);
+    }, 1000);
 
     return () => {
-      console.log('Cleanup effect running');
-      isMounted = false;
       clearTimeout(timer);
-      stopCamera();
+      stopScanning();
     };
-  }, [isOpen, onScan, handleClose, stopCamera]);
+  }, [isOpen, scanQRCode, stopScanning]);
 
-  // Handle page unload
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      stopCamera();
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [stopCamera]);
+  const handleUserMediaError = useCallback(() => {
+    setError('Camera access denied or not available. Please check permissions.');
+  }, []);
 
   if (!isOpen) return null;
 
@@ -203,8 +85,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
         </div>
         <button
           onClick={handleClose}
-          disabled={isLoading}
-          className="w-12 h-12 border-[3px] border-[#333] flex items-center justify-center hover:border-[#C9A962] transition-colors disabled:opacity-50"
+          className="w-12 h-12 border-[3px] border-[#333] flex items-center justify-center hover:border-[#C9A962] transition-colors"
         >
           <CloseIcon className="w-6 h-6" />
         </button>
@@ -227,23 +108,33 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
           </div>
         ) : (
           <>
-            {/* QR Scanner Container */}
+            {/* Camera Container */}
             <div className="relative">
               {/* Corner Accents */}
-              <div className="absolute -top-4 -left-4 w-8 h-8 border-t-[4px] border-l-[4px] border-[#C9A962]" />
-              <div className="absolute -top-4 -right-4 w-8 h-8 border-t-[4px] border-r-[4px] border-[#C9A962]" />
-              <div className="absolute -bottom-4 -left-4 w-8 h-8 border-b-[4px] border-l-[4px] border-[#C9A962]" />
-              <div className="absolute -bottom-4 -right-4 w-8 h-8 border-b-[4px] border-r-[4px] border-[#C9A962]" />
+              <div className="absolute -top-4 -left-4 w-8 h-8 border-t-[4px] border-l-[4px] border-[#C9A962] z-10" />
+              <div className="absolute -top-4 -right-4 w-8 h-8 border-t-[4px] border-r-[4px] border-[#C9A962] z-10" />
+              <div className="absolute -bottom-4 -left-4 w-8 h-8 border-b-[4px] border-l-[4px] border-[#C9A962] z-10" />
+              <div className="absolute -bottom-4 -right-4 w-8 h-8 border-b-[4px] border-r-[4px] border-[#C9A962] z-10" />
 
-              <div 
-                id="qr-reader" 
-                className="w-[300px] h-[300px] bg-[#111] border-[3px] border-[#333]"
-              />
+              <div className="w-[300px] h-[300px] bg-[#111] border-[3px] border-[#333] overflow-hidden">
+                <Webcam
+                  ref={webcamRef}
+                  audio={false}
+                  screenshotFormat="image/jpeg"
+                  videoConstraints={{
+                    facingMode: 'environment',
+                    width: 300,
+                    height: 300,
+                  }}
+                  onUserMediaError={handleUserMediaError}
+                  className="w-full h-full object-cover"
+                />
+              </div>
             </div>
 
             {/* Instructions */}
             <div className="mt-8 text-center">
-              {isLoading ? (
+              {!isScanning ? (
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-8 h-8 border-[3px] border-[#C9A962] border-t-transparent rounded-full animate-spin" />
                   <span className="text-[#C9A962] text-sm font-mono">Starting camera...</span>
@@ -255,7 +146,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
                   </p>
                   <div className="mt-4 flex items-center justify-center gap-2">
                     <div className="w-3 h-3 bg-[#C9A962] rounded-full animate-pulse" />
-                    <span className="text-[#C9A962] text-sm font-mono">Camera active</span>
+                    <span className="text-[#C9A962] text-sm font-mono">Scanning...</span>
                   </div>
                 </>
               )}
