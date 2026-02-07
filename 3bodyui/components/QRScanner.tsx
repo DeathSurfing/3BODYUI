@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 interface QRScannerProps {
@@ -9,48 +9,95 @@ interface QRScannerProps {
   onScan: (data: string) => void;
 }
 
+type ScannerState = 'idle' | 'initializing' | 'scanning' | 'error' | 'closing';
+
 export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const isRunningRef = useRef(false);
-  const [error, setError] = useState<string>('');
-  const [isInitializing, setIsInitializing] = useState(false);
+  const stateRef = useRef<ScannerState>('idle');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [state, setState] = useState<ScannerState>('idle');
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
-  // Cleanup function to stop scanner
-  const stopScanner = useCallback(async () => {
-    if (scannerRef.current && isRunningRef.current) {
-      try {
-        await scannerRef.current.stop();
-        isRunningRef.current = false;
-      } catch (err) {
-        // Scanner might already be stopped, which is fine
-        console.log('Scanner stop error (expected if already stopped):', err);
-      }
-    }
-  }, []);
-
-  // Handle close
-  const handleClose = useCallback(async () => {
-    await stopScanner();
-    onClose();
-  }, [stopScanner, onClose]);
-
-  // Initialize scanner when modal opens
+  // Sync ref with state
   useEffect(() => {
-    if (!isOpen) return;
+    stateRef.current = state;
+  }, [state]);
 
-    let isMounted = true;
+  // Cleanup function
+  const cleanupScanner = async (): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!scannerRef.current) {
+        resolve();
+        return;
+      }
+
+      const currentState = stateRef.current;
+      
+      // If already closing or idle, just resolve
+      if (currentState === 'closing' || currentState === 'idle') {
+        resolve();
+        return;
+      }
+
+      setState('closing');
+
+      // Give a small delay to let any ongoing operations complete
+      setTimeout(async () => {
+        try {
+          if (scannerRef.current) {
+            await scannerRef.current.stop();
+          }
+        } catch (err) {
+          // Ignore errors during cleanup
+          console.log('Cleanup error (expected):', err);
+        } finally {
+          scannerRef.current = null;
+          setState('idle');
+          resolve();
+        }
+      }, 100);
+    });
+  };
+
+  // Initialize scanner
+  useEffect(() => {
+    if (!isOpen) {
+      // Clean up when modal closes
+      cleanupScanner();
+      return;
+    }
+
+    // Reset state when opening
+    setErrorMsg('');
+    setState('idle');
+
+    let isActive = true;
 
     const initScanner = async () => {
+      // Wait for container to be ready
+      if (!containerRef.current) {
+        console.log('Container not ready, retrying...');
+        setTimeout(initScanner, 50);
+        return;
+      }
+
+      // Clean up any existing scanner first
+      if (scannerRef.current) {
+        await cleanupScanner();
+      }
+
+      if (!isActive) return;
+
       try {
-        setIsInitializing(true);
-        setError('');
+        setState('initializing');
 
-        // Create scanner instance
-        if (!scannerRef.current) {
-          scannerRef.current = new Html5Qrcode('qr-reader');
+        // Create new scanner instance
+        scannerRef.current = new Html5Qrcode('qr-reader');
+
+        if (!isActive) {
+          await cleanupScanner();
+          return;
         }
-
-        if (!isMounted) return;
 
         // Start scanning
         await scannerRef.current.start(
@@ -61,41 +108,53 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
           },
           (decodedText) => {
             // Success callback
-            if (isMounted) {
+            if (isActive && stateRef.current === 'scanning') {
               onScan(decodedText);
-              handleClose();
+              cleanupScanner().then(() => {
+                onClose();
+              });
             }
           },
           () => {
-            // Error callback - QR code not found, this is normal
-            // Don't do anything here
+            // Error callback - QR not found, this is normal
           }
         );
 
-        if (isMounted) {
-          isRunningRef.current = true;
-          setIsInitializing(false);
+        if (isActive) {
+          setState('scanning');
+        } else {
+          await cleanupScanner();
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Scanner init error:', err);
-        if (isMounted) {
-          setError('Camera access denied or not available. Please check permissions.');
-          setIsInitializing(false);
+        if (isActive) {
+          setErrorMsg(err?.message || 'Camera access denied or not available');
+          setState('error');
+          scannerRef.current = null;
         }
       }
     };
 
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(initScanner, 100);
+    // Delay initialization to ensure modal is rendered
+    const timer = setTimeout(initScanner, 200);
 
     return () => {
-      isMounted = false;
+      isActive = false;
       clearTimeout(timer);
-      stopScanner();
+      cleanupScanner();
     };
-  }, [isOpen, onScan, handleClose, stopScanner]);
+  }, [isOpen, onClose, onScan]);
+
+  // Handle manual close
+  const handleClose = async () => {
+    await cleanupScanner();
+    onClose();
+  };
 
   if (!isOpen) return null;
+
+  const isLoading = state === 'initializing' || state === 'closing';
+  const hasError = state === 'error' || errorMsg;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
@@ -110,21 +169,21 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
         </div>
         <button
           onClick={handleClose}
-          className="w-12 h-12 border-[3px] border-[#333] flex items-center justify-center hover:border-[#C9A962] transition-colors"
-          disabled={isInitializing}
+          disabled={isLoading}
+          className="w-12 h-12 border-[3px] border-[#333] flex items-center justify-center hover:border-[#C9A962] transition-colors disabled:opacity-50"
         >
           <CloseIcon className="w-6 h-6" />
         </button>
       </div>
 
       {/* Scanner Area */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
-        {error ? (
+      <div className="flex-1 flex flex-col items-center justify-center p-6" ref={containerRef}>
+        {hasError ? (
           <div className="text-center max-w-md">
             <div className="w-20 h-20 mx-auto mb-6 border-[3px] border-red-500 flex items-center justify-center">
               <AlertIcon className="w-10 h-10 text-red-500" />
             </div>
-            <p className="text-red-400 text-lg mb-4">{error}</p>
+            <p className="text-red-400 text-lg mb-4">{errorMsg || 'Failed to start camera'}</p>
             <button
               onClick={handleClose}
               className="px-8 py-4 bg-[#333] text-white font-display font-bold uppercase tracking-wider border-[3px] border-[#333] hover:border-[#C9A962] transition-colors"
@@ -150,10 +209,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
 
             {/* Instructions */}
             <div className="mt-8 text-center">
-              {isInitializing ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-3 h-3 bg-[#C9A962] rounded-full animate-pulse" />
-                  <span className="text-[#C9A962] text-sm font-mono">Initializing camera...</span>
+              {isLoading ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-[3px] border-[#C9A962] border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[#C9A962] text-sm font-mono">
+                    {state === 'initializing' ? 'Initializing camera...' : 'Closing...'}
+                  </span>
                 </div>
               ) : (
                 <>
@@ -162,7 +223,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
                   </p>
                   <div className="mt-4 flex items-center justify-center gap-2">
                     <div className="w-3 h-3 bg-[#C9A962] rounded-full animate-pulse" />
-                    <span className="text-[#C9A962] text-sm font-mono">Scanning...</span>
+                    <span className="text-[#C9A962] text-sm font-mono">Ready to scan</span>
                   </div>
                 </>
               )}
