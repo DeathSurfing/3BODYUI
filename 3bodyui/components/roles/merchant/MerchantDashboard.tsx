@@ -4,10 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { blockchainService } from '../../../services/blockchainService';
 import { Transaction, PoolStats } from '../../../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { QRCodeGenerator } from '../../QrCodeGenerator';
+
+// Mock merchant wallet - in production this would come from connected wallet
+const MERCHANT_WALLET = "0xMerchant...789ABC";
 
 export const MerchantDashboard: React.FC = () => {
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [stats, setStats] = useState<PoolStats | null>(null);
+  const [isQRGeneratorOpen, setIsQRGeneratorOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = () => {
@@ -29,6 +34,13 @@ export const MerchantDashboard: React.FC = () => {
 
   return (
     <div className="space-y-10">
+      {/* QR Code Generator Modal */}
+      <QRCodeGenerator
+        isOpen={isQRGeneratorOpen}
+        onClose={() => setIsQRGeneratorOpen(false)}
+        merchantWallet={MERCHANT_WALLET}
+      />
+
       {/* Header */}
       <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b-[3px] border-[#333]">
         <div className="flex items-center gap-4">
@@ -38,7 +50,14 @@ export const MerchantDashboard: React.FC = () => {
             <p className="text-[#666] text-base md:text-lg mt-1">Network health and transaction flows</p>
           </div>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
+          <button 
+            onClick={() => setIsQRGeneratorOpen(true)}
+            className="px-6 py-4 bg-[#C9A962] border-[3px] border-[#C9A962] text-black font-display font-bold text-sm uppercase tracking-wider hover:bg-[#E8D5A3] hover:border-[#E8D5A3] transition-colors flex items-center gap-2"
+          >
+            <QRIcon className="w-5 h-5" />
+            Generate Payment QR
+          </button>
           <button className="px-6 py-4 bg-[#111] border-[3px] border-[#333] text-sm font-mono uppercase tracking-wider hover:border-[#B87333] transition-colors">
             Export Logs
           </button>
@@ -203,5 +222,12 @@ const ActivityIcon: React.FC<{ className?: string }> = ({ className }) => (
 const NetworkIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-2.25-1.313M21 7.5v2.25m0-2.25l-2.25 1.313M3 7.5l2.25-1.313M3 7.5l2.25 1.313M3 7.5v2.25m9 3l2.25-1.313M12 12.75l-2.25-1.313M12 12.75V15m0 6.75l2.25-1.313M12 21.75V19.5m0 2.25l-2.25-1.313m0-16.875L12 2.25l2.25 1.313M21 14.25v2.25l-2.25 1.313m-13.5 0L3 16.5v-2.25" />
+  </svg>
+);
+
+const QRIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
   </svg>
 );
