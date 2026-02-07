@@ -8,13 +8,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    
     "tauri": "tauri",
-    
     "tauri:dev": "tauri dev",
     "tauri:dev:ios": "tauri ios dev",
     "tauri:dev:android": "tauri android dev",
-    
     "tauri:build": "tauri build",
     "tauri:build:ios": "tauri ios build",
     "tauri:build:android": "tauri android build"
@@ -25,6 +22,7 @@
     "@tauri-apps/plugin-shell": "^2.0.0",
     "@workos-inc/node": "^8.2.0",
     "autoprefixer": "^10.4.24",
+    "html5-qrcode": "^2.3.8",
     "next": "^16.1.6",
     "postcss": "^8.5.6",
     "react": "^19.2.4",

@@ -1,230 +1,240 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { blockchainService } from '../../../services/blockchainService';
-import { Transaction, TransactionStatus } from '../../../types';
-import { MOCK_WALLET_ADDRESS, EXCHANGE_RATE } from '../../../constants';
+import React, { useState, useEffect, useCallback } from 'react';
+import { QRScanner } from '../QRScanner';
+import { priceService, PriceData } from '../../../services/priceService';
 
 export const PayeeDashboard: React.FC = () => {
-  const [usdAmount, setUsdAmount] = useState<string>('');
-  const [activeTx, setActiveTx] = useState<Transaction | null>(null);
-  const [history, setHistory] = useState<Transaction[]>([]);
+  // Mock USDT balance - in production this would come from the wallet
+  const [usdtBalance] = useState<number>(1234.56);
+  
+  // Price data state
+  const [priceData, setPriceData] = useState<PriceData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  
+  // Countdown timer state
+  const [countdown, setCountdown] = useState(30);
+  
+  // QR Scanner state
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannedData, setScannedData] = useState<string>('');
 
+  // Fetch price data
+  const fetchPrice = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      const data = await priceService.fetchUSDTPrice();
+      setPriceData(data);
+      setCountdown(30); // Reset countdown
+    } catch (err) {
+      setError('Failed to fetch price data');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Initial fetch and auto-refresh
   useEffect(() => {
-    setHistory(blockchainService.getTransactions().filter(t => 
-      t.payeeAddress === MOCK_WALLET_ADDRESS || t.payeeAddress.includes('Alice')
-    ));
-  }, [activeTx]);
+    fetchPrice();
+    
+    // Auto-refresh every 30 seconds
+    const priceInterval = setInterval(fetchPrice, 30000);
+    
+    return () => clearInterval(priceInterval);
+  }, [fetchPrice]);
 
-  const handleInitiate = () => {
-    const amount = parseFloat(usdAmount);
-    if (isNaN(amount) || amount <= 0) return;
-    const tx = blockchainService.createRequest(MOCK_WALLET_ADDRESS, amount);
-    setActiveTx(tx);
+  // Countdown timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Handle QR scan
+  const handleScan = (data: string) => {
+    setScannedData(data);
+    // Here you would parse the QR data and initiate payment
+    alert(`Scanned: ${data}\n\nIn production, this would parse merchant payment details and show a confirmation screen.`);
   };
 
-  const handlePay402 = () => {
-    if (!activeTx) return;
-    blockchainService.authorizePayment(activeTx.id);
-    setActiveTx({ ...activeTx, status: TransactionStatus.AUTHORIZED });
+  // Calculate portfolio values
+  const portfolioValueUSD = usdtBalance * (priceData?.usdtPriceInUsd || 1);
+  const portfolioValueINR = usdtBalance * (priceData?.usdtPriceInInr || 83.15);
+
+  // Format currency
+  const formatUSD = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
+  const formatINR = (value: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
+      {/* QR Scanner Modal */}
+      <QRScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleScan}
+      />
+
       {/* Header */}
       <header className="flex items-center gap-4 pb-6 border-b-[3px] border-[#333]">
         <div className="w-2 h-12 bg-[#C9A962]" />
-        <div>
-          <h1 className="font-display text-3xl md:text-4xl font-bold">Exchange Assets</h1>
-          <p className="text-[#666] text-base md:text-lg mt-1">Convert USD to USDT via atomic smart contracts</p>
+        <div className="flex-1">
+          <h1 className="font-display text-3xl md:text-4xl font-bold">Payee Wallet</h1>
+          <p className="text-[#666] text-base md:text-lg mt-1">Scan QR codes to pay merchants</p>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
-        {/* Main Swap Card - Takes 3 columns */}
-        <div className="xl:col-span-3 space-y-8">
-          <div className="bg-[#111] border-[3px] border-[#333] p-8 md:p-10 relative">
-            <div className="absolute top-0 left-0 w-8 h-8 border-t-[3px] border-l-[3px] border-[#C9A962]" />
-            <div className="absolute top-0 right-0 w-8 h-8 border-t-[3px] border-r-[3px] border-[#C9A962]" />
-            
-            <div className="space-y-8">
-              {/* Amount Input */}
-              <div className="space-y-4">
-                <label className="block text-sm font-mono uppercase tracking-[0.15em] text-[#C9A962]">
-                  Payment Amount (USD)
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={usdAmount}
-                    onChange={(e) => setUsdAmount(e.target.value)}
-                    placeholder="0.00"
-                    disabled={!!activeTx}
-                    className="w-full h-20 md:h-24 bg-black border-[3px] border-[#333] pl-16 pr-6 text-3xl md:text-4xl font-mono text-white placeholder-[#333] focus:outline-none focus:border-[#C9A962] transition-colors disabled:opacity-50"
-                  />
-                  <span className="absolute left-6 top-1/2 -translate-y-1/2 text-[#C9A962] text-3xl md:text-4xl font-mono">$</span>
-                </div>
-              </div>
-
-              {/* Exchange Info */}
-              <div className="flex items-center justify-between py-6 border-y-2 border-[#222]">
-                <div>
-                  <span className="text-xs font-mono uppercase text-[#444] block mb-1">Exchange Rate</span>
-                  <p className="font-mono text-lg text-[#888]">1 USD = {EXCHANGE_RATE} USDT</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-mono uppercase text-[#444] block mb-1">You Receive</span>
-                  <p className="font-display text-2xl md:text-3xl font-bold text-[#C9A962]">
-                    {usdAmount ? (parseFloat(usdAmount) * EXCHANGE_RATE).toFixed(2) : '0.00'} USDT
-                  </p>
-                </div>
-              </div>
-
-              {/* Action */}
-              {!activeTx ? (
-                <button
-                  onClick={handleInitiate}
-                  disabled={!usdAmount || parseFloat(usdAmount) <= 0}
-                  className="w-full py-5 md:py-6 bg-[#C9A962] text-black font-display font-bold text-base uppercase tracking-wider border-[3px] border-[#C9A962] hover:bg-[#E8D5A3] hover:border-[#E8D5A3] disabled:opacity-50 transition-colors flex items-center justify-center gap-3"
-                >
-                  <SwapIcon className="w-6 h-6" />
-                  Initiate Swap Request
-                </button>
-              ) : (
-                <StatusCard transaction={activeTx} onAuthorize={handlePay402} />
-              )}
-            </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-3 gap-6">
-            <StatBox label="Current Balance" value="$12,450.00" />
-            <StatBox label="USDT Holdings" value="8,320.50" highlight />
-            <StatBox label="Today's Volume" value="$2,840.00" />
-          </div>
-        </div>
-
-        {/* Transaction History - Takes 2 columns */}
-        <div className="xl:col-span-2">
-          <div className="bg-[#111] border-[3px] border-[#333] p-6 md:p-8 h-full">
-            <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-[#222]">
-              <h2 className="font-display text-xl font-bold">Transaction History</h2>
-              <span className="text-sm font-mono text-[#444]">{history.length} transactions</span>
-            </div>
-
-            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-              {history.length === 0 ? (
-                <div className="text-center py-16 text-[#444]">
-                  <p className="text-base">No transactions yet</p>
-                </div>
-              ) : (
-                history.map((tx) => (
-                  <div key={tx.id} className="bg-black border-2 border-[#222] p-5 hover:border-[#333] transition-colors">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-mono text-xs text-[#444]">{tx.id}</span>
-                      <StatusBadge status={tx.status} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-display font-bold text-xl">${tx.usdAmount}</span>
-                      <span className="font-mono text-base text-[#C9A962]">{tx.usdtAmount} USDT</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Status Card Component
-interface StatusCardProps {
-  transaction: Transaction;
-  onAuthorize: () => void;
-}
-
-const StatusCard: React.FC<StatusCardProps> = ({ transaction, onAuthorize }) => {
-  const isAuthorized = transaction.status === TransactionStatus.AUTHORIZED;
-
-  return (
-    <div className={`border-[3px] p-6 space-y-4 ${
-      isAuthorized 
-        ? 'border-[#C9A962] bg-[#C9A962]/5' 
-        : 'border-[#B87333] bg-[#B87333]/5'
-    }`}>
-      <div className="flex items-center gap-4">
-        <div className={`w-14 h-14 flex items-center justify-center border-[3px] ${
-          isAuthorized ? 'border-[#C9A962]' : 'border-[#B87333]'
-        }`}>
-          {isAuthorized ? (
-            <ClockIcon className="w-7 h-7 text-[#C9A962]" />
-          ) : (
-            <AlertIcon className="w-7 h-7 text-[#B87333]" />
-          )}
-        </div>
-        <div className="flex-1">
-          <h3 className={`font-display font-bold text-lg ${isAuthorized ? 'text-[#C9A962]' : 'text-[#B87333]'}`}>
-            {isAuthorized ? 'Waiting for Liquidity Provider' : 'HTTP 402: Payment Required'}
-          </h3>
-          <p className="font-mono text-xs text-[#444] mt-1">{transaction.id}</p>
-        </div>
-      </div>
-
-      {isAuthorized ? (
-        <p className="text-sm text-[#C9A962]">Waiting for liquidity provider to fulfill this transaction...</p>
-      ) : (
+      {/* Action Bar */}
+      <div className="flex flex-col sm:flex-row gap-4">
         <button
-          onClick={onAuthorize}
-          className="w-full py-4 bg-[#B87333] text-white font-display font-bold text-sm uppercase tracking-wider border-[3px] border-[#B87333] hover:bg-[#CD7F32] transition-colors"
+          onClick={() => setIsScannerOpen(true)}
+          className="flex-1 py-5 bg-[#C9A962] text-black font-display font-bold text-lg uppercase tracking-wider border-[3px] border-[#C9A962] hover:bg-[#E8D5A3] hover:border-[#E8D5A3] transition-colors flex items-center justify-center gap-3"
         >
-          Authorize Smart Contract Payment
+          <ScanIcon className="w-6 h-6" />
+          Scan QR to Pay
         </button>
+
+        <div className="flex items-center gap-4 px-6 py-4 bg-[#111] border-[3px] border-[#333]">
+          <div className="text-center">
+            <span className="text-[10px] font-mono uppercase text-[#444] block">Next Update</span>
+            <span className="font-mono text-xl text-[#C9A962]">⏱️ {countdown}s</span>
+          </div>
+          <div className="w-[2px] h-10 bg-[#333]" />
+          <button
+            onClick={fetchPrice}
+            disabled={isLoading}
+            className="p-3 border-[3px] border-[#333] hover:border-[#C9A962] disabled:opacity-50 transition-colors"
+          >
+            <RefreshIcon className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Total Portfolio Value */}
+      <div className="bg-[#111] border-[3px] border-[#333] p-8 relative">
+        <div className="absolute top-0 left-0 w-8 h-8 border-t-[3px] border-l-[3px] border-[#C9A962]" />
+        <div className="absolute top-0 right-0 w-8 h-8 border-t-[3px] border-r-[3px] border-[#C9A962]" />
+        
+        <div className="text-center">
+          <span className="text-sm font-mono uppercase tracking-[0.15em] text-[#666] block mb-4">
+            Total Portfolio Value
+          </span>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <span className="font-display text-5xl md:text-6xl font-bold text-white">
+                {isLoading ? '...' : formatUSD(portfolioValueUSD)}
+              </span>
+              <span className="block text-sm font-mono text-[#666] mt-2">USD</span>
+            </div>
+            <div>
+              <span className="font-display text-5xl md:text-6xl font-bold text-[#C9A962]">
+                {isLoading ? '...' : formatINR(portfolioValueINR)}
+              </span>
+              <span className="block text-sm font-mono text-[#666] mt-2">INR</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* USDT Balance Card */}
+      <div className="bg-[#111] border-[3px] border-[#333] p-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          {/* Balance Display */}
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-[#26A17B] flex items-center justify-center">
+              <span className="font-display font-bold text-white text-2xl">₮</span>
+            </div>
+            <div>
+              <span className="text-sm font-mono uppercase text-[#666] block">USDT Balance</span>
+              <span className="font-display text-4xl font-bold">{usdtBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-sm font-mono text-[#26A17B] ml-2">USDT</span>
+            </div>
+          </div>
+
+          {/* Exchange Rate */}
+          <div className="flex flex-col sm:flex-row gap-6">
+            <div className="text-right">
+              <span className="text-xs font-mono uppercase text-[#444] block">USD Rate</span>
+              <span className="font-mono text-xl">
+                ${priceData?.usdtPriceInUsd.toFixed(4) || '1.0000'}
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-mono uppercase text-[#444] block">INR Rate</span>
+              <span className="font-mono text-xl text-[#C9A962]">
+                ₹{priceData?.usdtPriceInInr.toFixed(2) || '83.15'}
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-mono uppercase text-[#444] block">24h Change</span>
+              <span className={`font-mono text-xl ${
+                (priceData?.priceChange24h || 0) >= 0 ? 'text-green-500' : 'text-red-500'
+              }`}>
+                {(priceData?.priceChange24h || 0) >= 0 ? '+' : ''}
+                {(priceData?.priceChange24h || 0).toFixed(2)}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Last Updated */}
+        <div className="mt-6 pt-6 border-t border-[#222] flex items-center justify-between">
+          <span className="text-xs font-mono text-[#444]">
+            Last updated: {priceData?.lastUpdated.toLocaleTimeString() || 'Never'}
+          </span>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="text-xs font-mono text-[#444]">Live Rates</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-500/10 border-[3px] border-red-500/30 p-4 flex items-center gap-3">
+          <AlertIcon className="w-5 h-5 text-red-500" />
+          <span className="text-red-400 text-sm">{error}</span>
+          <button
+            onClick={fetchPrice}
+            className="ml-auto text-xs font-mono uppercase text-red-400 hover:text-red-300"
+          >
+            Retry
+          </button>
+        </div>
       )}
     </div>
   );
 };
 
-// Stat Box
-const StatBox: React.FC<{ label: string; value: string; highlight?: boolean }> = ({ 
-  label, value, highlight 
-}) => (
-  <div className="bg-[#111] border-[3px] border-[#333] p-6">
-    <span className="text-xs font-mono uppercase text-[#444] block mb-2">{label}</span>
-    <span className={`font-display text-xl md:text-2xl font-bold ${highlight ? 'text-[#C9A962]' : 'text-white'}`}>
-      {value}
-    </span>
-  </div>
-);
-
-// Status Badge
-const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const colors: Record<string, string> = {
-    'FULFILLED': 'border-green-500/30 text-green-500',
-    'PENDING': 'border-[#333] text-[#666]',
-    'HTTP_402_REQUIRED': 'border-[#B87333]/30 text-[#B87333]',
-    'AUTHORIZED': 'border-[#C9A962]/30 text-[#C9A962]',
-    'FAILED': 'border-red-500/30 text-red-500',
-  };
-
-  return (
-    <span className={`text-xs font-mono uppercase px-2 py-1 border ${colors[status] || colors['PENDING']}`}>
-      {status.replace(/_/g, ' ')}
-    </span>
-  );
-};
-
 // Icons
-const SwapIcon: React.FC<{ className?: string }> = ({ className }) => (
+const ScanIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5V6a3 3 0 013-3h1.5m13.5 0h1.5a3 3 0 013 3v1.5m0 13.5V18a3 3 0 01-3 3h-1.5m-13.5 0H6a3 3 0 01-3-3v-1.5m9-9v6m-3-3h6" />
   </svg>
 );
 
-const ClockIcon: React.FC<{ className?: string }> = ({ className }) => (
+const RefreshIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
   </svg>
 );
 
