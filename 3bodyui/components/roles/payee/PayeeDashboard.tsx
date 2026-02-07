@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { QRScanner } from '../QRScanner';
+import { QRScanner } from '../../QRScanner';
 import { priceService, PriceData } from '../../../services/priceService';
 
 export const PayeeDashboard: React.FC = () => {
