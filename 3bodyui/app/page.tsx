@@ -2,21 +2,17 @@
 
 import React, { useState } from 'react';
 import { UserRole } from '@/types';
-import { ThreeBodyLoader } from '@/components/loader/ThreeBodyLoader';
 import { Navbar } from '@/components/layout/Navbar';
 import { PayeeDashboard } from '@/components/roles/payee/PayeeDashboard';
 import { MerchantDashboard } from '@/components/roles/merchant/MerchantDashboard';
 import { LPDashboard } from '@/components/roles/liquidityProvider/LPDashboard';
+import { ThreeBodyLoader } from '@/components/loader/ThreeBodyLoader';
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<UserRole>(UserRole.UNSELECTED);
+  const [activeRole, setActiveRole] = useState<UserRole>(UserRole.PAYEE);
   const [walletConnected, setWalletConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-
-  const handleRoleSelect = (selectedRole: UserRole) => {
-    setRole(selectedRole);
-  };
 
   const handleConnectWallet = () => {
     setIsConnecting(true);
@@ -26,233 +22,221 @@ export default function Home() {
     }, 1500);
   };
 
-  const handleReset = () => {
-    setRole(UserRole.UNSELECTED);
-    setWalletConnected(false);
-  };
-
   if (loading) {
     return <ThreeBodyLoader onComplete={() => setLoading(false)} />;
   }
 
   return (
-    <div className="min-h-screen bg-black text-white grid-pattern safe-area-top safe-area-bottom">
-      {role !== UserRole.UNSELECTED && (
-        <Navbar
-          currentRole={role}
-          onReset={handleReset}
+    <div className="min-h-screen bg-black text-white flex">
+      {/* Sidebar */}
+      <Sidebar 
+        activeRole={activeRole} 
+        onRoleChange={setActiveRole}
+        walletConnected={walletConnected}
+        onConnect={handleConnectWallet}
+        isConnecting={isConnecting}
+      />
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-h-screen">
+        <Navbar 
+          currentRole={activeRole}
+          onReset={() => {}}
           walletConnected={walletConnected}
         />
-      )}
-
-      <main className="flex-1 relative pb-24">
-        {role === UserRole.UNSELECTED ? (
-          <RoleSelection onSelect={handleRoleSelect} />
-        ) : !walletConnected ? (
-          <ConnectWalletScreen 
-            onConnect={handleConnectWallet} 
-            isConnecting={isConnecting}
-            role={role}
-          />
-        ) : (
-          <DashboardContent role={role} />
-        )}
-      </main>
-
-      {/* Brutalist Footer */}
-      <footer className="fixed bottom-0 w-full bg-[#0a0a0a]/90 backdrop-blur-sm border-t-2 border-[#333] py-3 z-40">
-        <div className="max-w-7xl mx-auto px-4 flex justify-between items-center text-[10px] text-[#666] font-mono uppercase tracking-wider">
-          <span>© 2024 Three Body Protocol</span>
-          <div className="flex gap-4">
-            <span className="hidden sm:inline">Block: <span className="text-[#C9A962]">19,402,502</span></span>
-            <span className="hidden sm:inline">Gas: <span className="text-[#C9A962]">12 Gwei</span></span>
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-              Mainnet
-            </span>
+        
+        <main className="flex-1 p-8 md:p-12 lg:p-16 overflow-y-auto">
+          <div className="max-w-7xl mx-auto">
+            <DashboardContent 
+              role={activeRole} 
+              walletConnected={walletConnected}
+              onConnect={handleConnectWallet}
+              isConnecting={isConnecting}
+            />
           </div>
-        </div>
-      </footer>
+        </main>
+      </div>
     </div>
   );
 }
 
-// Role Selection Component
-interface RoleSelectionProps {
-  onSelect: (role: UserRole) => void;
+// Sidebar Component
+interface SidebarProps {
+  activeRole: UserRole;
+  onRoleChange: (role: UserRole) => void;
+  walletConnected: boolean;
+  onConnect: () => void;
+  isConnecting: boolean;
 }
 
-const RoleSelection: React.FC<RoleSelectionProps> = ({ onSelect }) => {
+const Sidebar: React.FC<SidebarProps> = ({ 
+  activeRole, 
+  onRoleChange, 
+  walletConnected,
+  onConnect,
+  isConnecting
+}) => {
   const roles = [
     {
       role: UserRole.PAYEE,
       title: 'Payee',
-      subtitle: 'Initiate Swaps',
-      description: 'Convert USD to USDT via atomic smart contracts. Simple, fast, secure.',
-      icon: PayeeIcon,
+      subtitle: 'Swap USD to USDT',
       color: '#C9A962',
-      delay: 'delay-100',
+      icon: PayeeIcon,
     },
     {
       role: UserRole.MERCHANT,
       title: 'Merchant',
       subtitle: 'Monitor Protocol',
-      description: 'Oversee network health, manage fees, and track real-time settlement flows.',
-      icon: MerchantIcon,
       color: '#B87333',
-      delay: 'delay-200',
+      icon: MerchantIcon,
     },
     {
       role: UserRole.LIQUIDITY_PROVIDER,
       title: 'Liquidity Provider',
       subtitle: 'Earn Yield',
-      description: 'Supply USDT liquidity and earn protocol fees on every transaction.',
-      icon: LPIcon,
       color: '#8B7355',
-      delay: 'delay-300',
+      icon: LPIcon,
     },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 pt-16 md:pt-24 pb-12 min-h-screen flex flex-col">
-      {/* Header */}
-      <div className="text-center mb-12 md:mb-16 space-y-4 animate-fade-in-up">
-          <div className="inline-block">
-            <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-[#C9A962]">
-              3 BODY
-            </h1>
-            <div className="mt-2 h-[3px] bg-[#C9A962]" />
+    <aside className="w-24 md:w-80 bg-[#0a0a0a] border-r-[3px] border-[#333] flex flex-col">
+      {/* Logo */}
+      <div className="p-6 md:p-8 border-b-[3px] border-[#333]">
+        <div className="flex items-center justify-center md:justify-start gap-4">
+          <div className="w-14 h-14 bg-[#111] border-[3px] border-[#C9A962] flex items-center justify-center">
+            <span className="font-display font-bold text-2xl text-[#C9A962]">3B</span>
+          </div>
+          <div className="hidden md:block">
+            <span className="font-display font-bold text-2xl block">3 BODY</span>
+            <span className="text-xs font-mono uppercase tracking-[0.2em] text-[#666]">
+              Payment Protocol
+            </span>
+          </div>
         </div>
-        <p className="text-[#B0B0B0] text-base md:text-lg max-w-xl mx-auto font-body">
-          Decentralized tri-party settlement protocol. Choose your orbit to participate in the exchange ecosystem.
-        </p>
       </div>
 
-      {/* Role Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 w-full max-w-6xl mx-auto flex-1">
-        {roles.map(({ role, title, subtitle, description, icon: Icon, color, delay }) => (
-          <button
-            key={role}
-            onClick={() => onSelect(role)}
-            className={`group relative bg-[#141414] border-[3px] border-[#333] p-6 md:p-8 text-left transition-all duration-300 hover:border-[${color}] hover:shadow-[4px_4px_0px_rgba(201,169,98,0.25)] hover:-translate-y-1 animate-fade-in-up ${delay}`}
-          >
-            {/* Art Deco Corner Accents */}
-            <div 
-              className="absolute top-0 left-0 w-6 h-6 border-t-[3px] border-l-[3px] transition-colors duration-300"
-              style={{ borderColor: 'transparent' }}
-            />
-            <div 
-              className="absolute bottom-0 right-0 w-6 h-6 border-b-[3px] border-r-[3px] transition-colors duration-300"
-              style={{ borderColor: 'transparent' }}
-            />
-            
-            {/* Hover Corner Accents */}
-            <div 
-              className="absolute top-0 left-0 w-6 h-6 border-t-[3px] border-l-[3px] opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-              style={{ borderColor: color }}
-            />
-            <div 
-              className="absolute bottom-0 right-0 w-6 h-6 border-b-[3px] border-r-[3px] opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-              style={{ borderColor: color }}
-            />
-
-            {/* Icon Container */}
-            <div 
-              className="w-14 h-14 md:w-16 md:h-16 mb-6 flex items-center justify-center border-[3px] border-[#333] group-hover:border-[#C9A962] transition-colors duration-300"
-              style={{ backgroundColor: `${color}10` }}
+      {/* Role Navigation */}
+      <nav className="flex-1 py-8 px-4 md:px-6 space-y-3">
+        {roles.map(({ role, title, subtitle, color, icon: Icon }) => {
+          const isActive = activeRole === role;
+          return (
+            <button
+              key={role}
+              onClick={() => onRoleChange(role)}
+              className={`w-full flex items-center gap-4 p-5 md:p-6 border-[3px] transition-all duration-200 group text-left ${
+                isActive 
+                  ? 'bg-[#111] border-[#C9A962]' 
+                  : 'bg-transparent border-transparent hover:border-[#333]'
+              }`}
             >
-              <Icon className="w-7 h-7 md:w-8 md:h-8" color={color} />
-            </div>
+              <div 
+                className={`w-14 h-14 flex-shrink-0 flex items-center justify-center border-[3px] transition-colors ${
+                  isActive ? 'border-[#C9A962] bg-[#C9A962]/10' : 'border-[#333] group-hover:border-[#444]'
+                }`}
+              >
+                <Icon className="w-7 h-7" color={isActive ? '#C9A962' : '#666'} />
+              </div>
+              <div className="hidden md:block">
+                <span className={`block font-display font-bold text-lg ${isActive ? 'text-white' : 'text-[#B0B0B0]'}`}>
+                  {title}
+                </span>
+                <span className="block text-sm font-mono text-[#666] mt-1">
+                  {subtitle}
+                </span>
+              </div>
+              {isActive && (
+                <div className="hidden md:block ml-auto w-2 h-2 bg-[#C9A962] rounded-full" />
+              )}
+            </button>
+          );
+        })}
+      </nav>
 
-            {/* Content */}
-            <div className="space-y-2">
-              <p className="text-[10px] md:text-xs font-mono uppercase tracking-[0.2em]" style={{ color }}>
-                {subtitle}
-              </p>
-              <h3 className="font-display text-xl md:text-2xl font-bold text-white group-hover:text-[#C9A962] transition-colors">
-                {title}
-              </h3>
-              <p className="text-[#B0B0B0] text-sm leading-relaxed">
-                {description}
-              </p>
-            </div>
-
-            {/* Arrow Indicator */}
-            <div className="mt-6 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#666] group-hover:text-[#C9A962] transition-all duration-300 opacity-0 group-hover:opacity-100 transform translate-x-[-10px] group-hover:translate-x-0">
-              <span>Enter Portal</span>
-              <ArrowIcon className="w-4 h-4" />
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {/* Stats Bar */}
-      <div className="mt-12 md:mt-16 flex flex-wrap justify-center gap-6 md:gap-12 text-[10px] font-mono uppercase tracking-[0.15em] text-[#666]">
-        <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-          <span>Mainnet Live</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 bg-[#C9A962] rounded-full" />
-          <span>3B Contracts v2.0</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 bg-[#B87333] rounded-full" />
-          <span>HTTP 402 Enabled</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Connect Wallet Screen
-interface ConnectWalletProps {
-  onConnect: () => void;
-  isConnecting: boolean;
-  role: UserRole;
-}
-
-const ConnectWalletScreen: React.FC<ConnectWalletProps> = ({ onConnect, isConnecting, role }) => {
-  const roleNames: Record<UserRole, string> = {
-    [UserRole.UNSELECTED]: '',
-    [UserRole.PAYEE]: 'Payee',
-    [UserRole.MERCHANT]: 'Merchant',
-    [UserRole.LIQUIDITY_PROVIDER]: 'Liquidity Provider',
-  };
-
-  return (
-    <div className="max-w-md mx-auto mt-12 md:mt-20 px-4 animate-fade-in-up">
-      <div className="bg-[#141414] border-[3px] border-[#333] p-8 md:p-10 relative">
-        {/* Corner Accents */}
-        <div className="absolute top-0 left-0 w-8 h-8 border-t-[3px] border-l-[3px] border-[#C9A962]" />
-        <div className="absolute top-0 right-0 w-8 h-8 border-t-[3px] border-r-[3px] border-[#C9A962]" />
-        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-[3px] border-l-[3px] border-[#C9A962]" />
-        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-[3px] border-r-[3px] border-[#C9A962]" />
-
-        <div className="text-center space-y-6">
-          {/* Icon */}
-          <div className="w-16 h-16 mx-auto border-[3px] border-[#333] flex items-center justify-center bg-[#C9A962]/10">
-            <WalletIcon className="w-8 h-8 text-[#C9A962]" />
-          </div>
-
-          {/* Text */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#C9A962]">
-              {roleNames[role]} Access
-            </p>
-            <h2 className="font-display text-2xl md:text-3xl font-bold">
-              Connect Wallet
-            </h2>
-            <p className="text-[#B0B0B0] text-sm">
-              Verify your identity to access the {roleNames[role].toLowerCase()} dashboard.
-            </p>
-          </div>
-
-          {/* Connect Button */}
+      {/* Wallet Section */}
+      <div className="p-6 md:p-8 border-t-[3px] border-[#333]">
+        {!walletConnected ? (
           <button
             onClick={onConnect}
             disabled={isConnecting}
-            className="w-full py-4 bg-[#C9A962] text-[#0a0a0a] font-display font-bold text-sm uppercase tracking-wider border-[3px] border-[#C9A962] hover:bg-[#E8D5A3] hover:border-[#E8D5A3] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+            className="w-full py-4 md:py-5 bg-[#C9A962] text-black font-display font-bold text-sm uppercase tracking-wider border-[3px] border-[#C9A962] hover:bg-[#E8D5A3] hover:border-[#E8D5A3] disabled:opacity-50 transition-colors flex items-center justify-center gap-3"
+          >
+            {isConnecting ? (
+              <>
+                <LoadingSpinner />
+                <span className="hidden md:inline">Connecting...</span>
+              </>
+            ) : (
+              <>
+                <WalletIcon className="w-5 h-5" />
+                <span className="hidden md:inline">Connect Wallet</span>
+              </>
+            )}
+          </button>
+        ) : (
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 border-[3px] border-[#C9A962] bg-[#C9A962]/10 flex items-center justify-center">
+              <WalletIcon className="w-7 h-7 text-[#C9A962]" />
+            </div>
+            <div className="hidden md:block">
+              <span className="block text-sm font-mono uppercase tracking-wider text-[#666]">Connected</span>
+              <span className="block font-mono text-base text-[#C9A962] mt-1">0x3B0D...Y789</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer Info */}
+      <div className="p-6 border-t border-[#222] text-sm font-mono text-[#444] hidden md:block">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          <span>Mainnet Live</span>
+        </div>
+        <div className="mb-1">Block: 19,402,502</div>
+        <div className="text-[#333] mt-3">v2.0.0</div>
+      </div>
+    </aside>
+  );
+};
+
+// Dashboard Content
+interface DashboardContentProps {
+  role: UserRole;
+  walletConnected: boolean;
+  onConnect: () => void;
+  isConnecting: boolean;
+}
+
+const DashboardContent: React.FC<DashboardContentProps> = ({ 
+  role, 
+  walletConnected,
+  onConnect,
+  isConnecting
+}) => {
+  if (!walletConnected) {
+    return (
+      <div className="h-full flex items-center justify-center min-h-[60vh]">
+        <div className="bg-[#111] border-[3px] border-[#333] p-12 md:p-16 max-w-lg w-full text-center relative">
+          {/* Corner Accents */}
+          <div className="absolute top-0 left-0 w-8 h-8 border-t-[3px] border-l-[3px] border-[#C9A962]" />
+          <div className="absolute top-0 right-0 w-8 h-8 border-t-[3px] border-r-[3px] border-[#C9A962]" />
+          <div className="absolute bottom-0 left-0 w-8 h-8 border-b-[3px] border-l-[3px] border-[#C9A962]" />
+          <div className="absolute bottom-0 right-0 w-8 h-8 border-b-[3px] border-r-[3px] border-[#C9A962]" />
+
+          <div className="w-20 h-20 mx-auto mb-8 border-[3px] border-[#333] flex items-center justify-center bg-[#C9A962]/10">
+            <WalletIcon className="w-10 h-10 text-[#C9A962]" />
+          </div>
+
+          <h2 className="font-display text-3xl font-bold mb-4">Connect Wallet</h2>
+          <p className="text-[#B0B0B0] text-base mb-8">
+            Connect your wallet to access the dashboard features and manage your assets.
+          </p>
+
+          <button
+            onClick={onConnect}
+            disabled={isConnecting}
+            className="w-full py-5 bg-[#C9A962] text-black font-display font-bold text-base uppercase tracking-wider border-[3px] border-[#C9A962] hover:bg-[#E8D5A3] hover:border-[#E8D5A3] disabled:opacity-50 transition-colors flex items-center justify-center gap-4"
           >
             {isConnecting ? (
               <>
@@ -261,28 +245,16 @@ const ConnectWalletScreen: React.FC<ConnectWalletProps> = ({ onConnect, isConnec
               </>
             ) : (
               <>
-                <WalletIcon className="w-5 h-5" />
+                <WalletIcon className="w-6 h-6" />
                 Connect Wallet
               </>
             )}
           </button>
-
-          {/* Security Note */}
-          <p className="text-[10px] text-[#666] font-mono">
-            Secure connection via Web3 authentication
-          </p>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  }
 
-// Dashboard Content
-interface DashboardContentProps {
-  role: UserRole;
-}
-
-const DashboardContent: React.FC<DashboardContentProps> = ({ role }) => {
   switch (role) {
     case UserRole.PAYEE:
       return <PayeeDashboard />;
@@ -311,12 +283,6 @@ const MerchantIcon: React.FC<{ className?: string; color?: string }> = ({ classN
 const LPIcon: React.FC<{ className?: string; color?: string }> = ({ className, color = '#8B7355' }) => (
   <svg className={className} fill="none" stroke={color} strokeWidth="1.5" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const ArrowIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
   </svg>
 );
 

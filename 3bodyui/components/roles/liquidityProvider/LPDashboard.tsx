@@ -35,147 +35,131 @@ export const LPDashboard: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-8 md:py-12 px-4 space-y-8 animate-fade-in-up">
+    <div className="space-y-10">
       {/* Header */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b-[3px] border-[#333] pb-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-8 bg-[#8B7355]" />
-            <div>
-              <h1 className="font-display text-2xl md:text-3xl font-bold">Liquidity Portal</h1>
-              <p className="text-[#B0B0B0] text-sm">
-                Earn 0.01% on every transaction fulfilled by your collateral
-              </p>
-            </div>
+      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b-[3px] border-[#333]">
+        <div className="flex items-center gap-4">
+          <div className="w-2 h-12 bg-[#8B7355]" />
+          <div>
+            <h1 className="font-display text-3xl md:text-4xl font-bold">Liquidity Portal</h1>
+            <p className="text-[#666] text-base md:text-lg mt-1">Earn 0.01% on every transaction fulfilled by your collateral</p>
           </div>
         </div>
         
-        {/* Stats Summary */}
-        <div className="flex items-center gap-6 p-4 bg-[#111] border-[3px] border-[#333]">
+        <div className="flex items-center gap-6 p-6 bg-[#111] border-[3px] border-[#333]">
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-[#666]">Available LP Balance</div>
-            <div className="font-display text-xl font-bold text-white">15,402.50 <span className="text-xs font-normal text-[#666]">USDT</span></div>
+            <span className="text-sm font-mono uppercase text-[#444] block mb-1">Available Balance</span>
+            <p className="font-display text-2xl font-bold">15,402 <span className="text-base text-[#666]">USDT</span></p>
           </div>
-          <div className="h-10 w-[2px] bg-[#333]" />
-          <div className="text-right">
-            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-[#666]">Earnings (YTD)</div>
-            <div className="font-display text-xl font-bold text-[#C9A962]">+$842.15</div>
+          <div className="w-[2px] h-12 bg-[#333]" />
+          <div>
+            <span className="text-sm font-mono uppercase text-[#444] block mb-1">Earnings (YTD)</span>
+            <p className="font-display text-2xl font-bold text-[#C9A962]">+$842.15</p>
           </div>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-        {/* Management Side */}
-        <div className="space-y-6">
-          {/* Pool Strength Card */}
-          <div className="bg-[#111] border-[3px] border-[#333] p-6 md:p-8 relative">
-            {/* Corner Accents */}
-            <div className="absolute top-0 left-0 w-6 h-6 border-t-[3px] border-l-[3px] border-[#8B7355]" />
-            <div className="absolute top-0 right-0 w-6 h-6 border-t-[3px] border-r-[3px] border-[#8B7355]" />
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        {/* Pool Management */}
+        <div className="space-y-8">
+          <div className="bg-[#111] border-[3px] border-[#333] p-8 relative">
+            <div className="absolute top-0 left-0 w-8 h-8 border-t-[3px] border-l-[3px] border-[#8B7355]" />
+            <div className="absolute top-0 right-0 w-8 h-8 border-t-[3px] border-r-[3px] border-[#8B7355]" />
             
             <div className="space-y-8">
               <div>
-                <h3 className="text-[10px] font-mono uppercase tracking-[0.15em] text-[#666] mb-1">Current Pool Strength</h3>
-                <div className="font-display text-3xl md:text-4xl font-bold text-white">
-                  ${stats?.availableLiquidity.toLocaleString()}
-                </div>
+                <span className="text-sm font-mono uppercase text-[#444] block mb-2">Current Pool Strength</span>
+                <p className="font-display text-4xl font-bold">${stats?.availableLiquidity.toLocaleString()}</p>
                 
-                {/* Progress Bar */}
-                <div className="mt-4">
-                  <div className="h-2 w-full bg-[#222] border border-[#333]">
+                <div className="mt-6">
+                  <div className="h-3 bg-[#222] border-2 border-[#333]">
                     <div 
                       className="h-full bg-[#C9A962] transition-all duration-1000" 
                       style={{ width: `${(stats?.utilizationRate || 0) * 100}%` }} 
                     />
                   </div>
-                  <div className="flex justify-between mt-2 text-[10px] font-mono uppercase text-[#666]">
-                    <span>Utilization</span>
-                    <span className="text-[#C9A962]">{((stats?.utilizationRate || 0) * 100).toFixed(1)}%</span>
+                  <div className="flex justify-between mt-3">
+                    <span className="text-sm font-mono text-[#444]">Utilization</span>
+                    <span className="text-sm font-mono text-[#C9A962]">{((stats?.utilizationRate || 0) * 100).toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
 
-              {/* Deposit Section */}
-              <div className="space-y-4 pt-6 border-t border-[#333]">
+              <div className="pt-8 border-t-2 border-[#222]">
                 <div className="relative">
                   <input 
                     type="number"
                     value={depositAmount}
                     onChange={(e) => setDepositAmount(e.target.value)}
                     placeholder="Add USDT liquidity..."
-                    className="w-full bg-black border-[3px] border-[#333] py-4 pl-4 pr-24 text-white placeholder-[#444] focus:outline-none focus:border-[#8B7355] transition-colors font-mono"
+                    className="w-full bg-black border-[3px] border-[#333] py-5 pl-5 pr-28 text-lg text-white placeholder-[#333] focus:outline-none focus:border-[#8B7355] font-mono"
                   />
                   <button 
                     onClick={handleDeposit}
-                    className="absolute right-2 top-2 bottom-2 px-4 bg-[#8B7355] text-white text-xs font-display font-bold uppercase tracking-wider border-[3px] border-[#8B7355] hover:bg-[#C9A962] hover:border-[#C9A962] transition-colors"
+                    className="absolute right-2 top-2 bottom-2 px-6 bg-[#8B7355] text-white text-sm font-bold uppercase border-[3px] border-[#8B7355] hover:bg-[#C9A962] hover:border-[#C9A962] transition-colors"
                   >
                     Deposit
                   </button>
                 </div>
-                <p className="text-[10px] text-[#666] font-mono">
-                  Liquidity is locked for 24h after each transaction. Fees are auto-compounded.
-                </p>
+                <p className="text-sm text-[#444] font-mono mt-3">Liquidity is locked for 24h after each transaction</p>
               </div>
             </div>
           </div>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-[#111] border-[3px] border-[#333] p-4">
-              <span className="text-[9px] font-mono uppercase tracking-[0.15em] text-[#666] block mb-1">Total Staked</span>
-              <span className="font-display text-lg font-bold text-white">$1.2M</span>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-[#111] border-[3px] border-[#333] p-6">
+              <span className="text-sm font-mono uppercase text-[#444] block mb-2">Total Staked</span>
+              <span className="font-display text-2xl font-bold">$1.2M</span>
             </div>
-            <div className="bg-[#111] border-[3px] border-[#333] p-4">
-              <span className="text-[9px] font-mono uppercase tracking-[0.15em] text-[#666] block mb-1">APY</span>
-              <span className="font-display text-lg font-bold text-[#C9A962]">12.4%</span>
+            <div className="bg-[#111] border-[3px] border-[#333] p-6">
+              <span className="text-sm font-mono uppercase text-[#444] block mb-2">APY</span>
+              <span className="font-display text-2xl font-bold text-[#C9A962]">12.4%</span>
             </div>
           </div>
         </div>
 
-        {/* Request Fulfilment */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Market Requests */}
+        <div className="xl:col-span-2 space-y-8">
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-xl font-bold flex items-center gap-2">
-              <ActivityIcon className="w-5 h-5 text-[#8B7355]" />
+            <h2 className="font-display text-2xl font-bold flex items-center gap-3">
+              <ActivityIcon className="w-6 h-6 text-[#8B7355]" />
               Market Requests
             </h2>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-[10px] font-mono uppercase tracking-wider text-[#666]">
-                Listening for AUTHORIZED 402s
-              </span>
+            <div className="flex items-center gap-3">
+              <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-sm font-mono text-[#444]">Listening for requests...</span>
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {pendingRequests.length === 0 && (
-              <div className="col-span-2 flex flex-col items-center justify-center py-16 bg-[#111] border-[3px] border-[#333] border-dashed text-[#666]">
-                <SearchIcon className="w-12 h-12 mb-4 opacity-30" />
-                <p className="text-sm font-medium">No open swap requests found in current block</p>
-                <p className="text-[10px] font-mono mt-2 text-[#444]">Waiting for new transactions...</p>
+              <div className="col-span-2 py-20 bg-[#111] border-[3px] border-[#333] border-dashed text-center">
+                <SearchIcon className="w-16 h-16 mx-auto mb-6 text-[#333]" />
+                <p className="text-xl text-[#666] mb-2">No open requests</p>
+                <p className="text-base font-mono text-[#444]">Waiting for new transactions...</p>
               </div>
             )}
             {pendingRequests.map(req => (
-              <div key={req.id} className="bg-[#111] border-[3px] border-[#333] p-6 flex flex-col justify-between hover:border-[#8B7355] transition-colors group">
-                <div className="flex justify-between items-start mb-4">
+              <div key={req.id} className="bg-[#111] border-[3px] border-[#333] p-8 hover:border-[#8B7355] transition-colors">
+                <div className="flex items-start justify-between mb-6">
                   <div>
-                    <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-[#666] block mb-1">Request ID</span>
-                    <span className="font-mono text-xs text-[#B0B0B0]">{req.id}</span>
+                    <span className="text-sm font-mono uppercase text-[#444] block mb-1">Request ID</span>
+                    <span className="font-mono text-base text-[#666]">{req.id}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-[#666] block mb-1">Yield</span>
-                    <span className="text-xs font-bold text-[#C9A962] font-display">+${req.fee.toFixed(4)} USDT</span>
+                    <span className="text-sm font-mono uppercase text-[#444] block mb-1">Your Yield</span>
+                    <span className="text-lg font-bold text-[#C9A962]">+${req.fee.toFixed(4)} USDT</span>
                   </div>
                 </div>
                 
-                <div className="mb-6">
-                  <div className="font-display text-2xl font-bold text-white mb-1">${req.usdAmount} USD</div>
-                  <div className="text-xs text-[#666] font-mono">Payee: {req.payeeAddress.slice(0, 14)}...</div>
+                <div className="mb-8">
+                  <p className="font-display text-3xl font-bold mb-2">${req.usdAmount} USD</p>
+                  <p className="text-sm text-[#444] font-mono">Payee: {req.payeeAddress.slice(0, 16)}...</p>
                 </div>
 
                 <button 
                   onClick={() => handleFulfill(req.id)}
-                  className="w-full py-3 bg-[#222] text-white font-display font-bold text-sm uppercase tracking-wider border-[3px] border-[#333] group-hover:bg-[#8B7355] group-hover:border-[#8B7355] transition-all"
+                  className="w-full py-5 bg-[#222] text-white font-display font-bold text-base uppercase tracking-wider border-[3px] border-[#333] hover:bg-[#8B7355] hover:border-[#8B7355] transition-all"
                 >
                   Fulfill Transaction
                 </button>
@@ -188,7 +172,6 @@ export const LPDashboard: React.FC = () => {
   );
 };
 
-// Icons
 const ActivityIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
