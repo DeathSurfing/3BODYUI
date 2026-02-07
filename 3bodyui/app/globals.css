@@ -1,10 +1,488 @@
 @import "tailwindcss";
 
-/* Custom Utilities that were in index.html */
+/* ============================================
+   3 BODY PAYMENT - Swiss Brutalist × Art Deco
+   Design System
+   ============================================ */
+
+:root {
+  /* Background Colors - Pure Black Brutalist */
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-card: #111111;
+  --bg-elevated: #1a1a1a;
+  --bg-hover: #222222;
+  
+  /* Art Deco Gold/Bronze Accents */
+  --gold-primary: #C9A962;
+  --gold-light: #E8D5A3;
+  --gold-dark: #8B7355;
+  --gold-muted: #5C4F3A;
+  --copper: #B87333;
+  --copper-light: #D4915D;
+  
+  /* Text Colors */
+  --text-primary: #FFFFFF;
+  --text-secondary: #B0B0B0;
+  --text-muted: #666666;
+  --text-gold: var(--gold-primary);
+  
+  /* Border & Divider Colors */
+  --border-primary: #333333;
+  --border-heavy: #444444;
+  --border-gold: var(--gold-primary);
+  --border-gold-dim: rgba(201, 169, 98, 0.3);
+  
+  /* Shadow System - Brutalist */
+  --shadow-sm: 2px 2px 0px rgba(201, 169, 98, 0.2);
+  --shadow-md: 4px 4px 0px rgba(201, 169, 98, 0.25);
+  --shadow-lg: 8px 8px 0px rgba(201, 169, 98, 0.3);
+  --shadow-xl: 12px 12px 0px rgba(201, 169, 98, 0.35);
+  --shadow-lift: 0 20px 40px rgba(0, 0, 0, 0.8);
+  
+  /* Spacing Scale - Mobile Optimized */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-safe: env(safe-area-inset-bottom);
+  
+  /* Typography Scale */
+  --text-hero: 2.5rem;
+  --text-display: 1.75rem;
+  --text-title: 1.25rem;
+  --text-body: 1rem;
+  --text-caption: 0.875rem;
+  --text-small: 0.75rem;
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body), system-ui, sans-serif;
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ============================================
+   Typography
+   ============================================ */
+
+.font-display {
+  font-family: var(--font-display), system-ui, sans-serif;
+}
+
+.font-body {
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+.text-hero {
+  font-size: var(--text-hero);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text-display {
+  font-size: var(--text-display);
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.text-title {
+  font-size: var(--text-title);
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.text-body {
+  font-size: var(--text-body);
+  line-height: 1.5;
+}
+
+.text-caption {
+  font-size: var(--text-caption);
+  line-height: 1.4;
+}
+
+.text-small {
+  font-size: var(--text-small);
+  line-height: 1.4;
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes goldPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(201, 169, 98, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px 10px rgba(201, 169, 98, 0.2);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes borderShimmer {
+  0% {
+    border-color: var(--border-primary);
+  }
+  50% {
+    border-color: var(--gold-primary);
+  }
+  100% {
+    border-color: var(--border-primary);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-shimmer {
+  background-color: rgba(201, 169, 98, 0.1);
+  animation: shimmer 2s infinite;
+}
+
+.animate-gold-pulse {
+  animation: goldPulse 2s ease-in-out infinite;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.animate-border-shimmer {
+  animation: borderShimmer 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* ============================================
+   Brutalist Components
+   ============================================ */
+
+/* Brutalist Cards */
+.card-brutalist {
+  background-color: var(--bg-card);
+  border: 3px solid var(--border-primary);
+  transition: all 0.2s ease;
+}
+
+.card-brutalist:hover {
+  border-color: var(--gold-primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.card-brutalist:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Brutalist Inputs */
+.input-brutalist {
+  background-color: var(--bg-secondary);
+  border: 3px solid var(--border-primary);
+  color: var(--text-primary);
+  font-family: var(--font-mono), monospace;
+  padding: 16px;
+  font-size: var(--text-body);
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.input-brutalist:focus {
+  outline: none;
+  border-color: var(--gold-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.input-brutalist::placeholder {
+  color: var(--text-muted);
+}
+
+/* Brutalist Buttons */
+.btn-brutalist {
+  background-color: var(--bg-card);
+  border: 3px solid var(--border-primary);
+  color: var(--text-primary);
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  padding: 16px 32px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-brutalist:hover {
+  border-color: var(--gold-primary);
+  background-color: var(--bg-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.btn-brutalist:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.btn-primary {
+  background-color: var(--gold-primary);
+  border-color: var(--gold-primary);
+  color: var(--bg-primary);
+}
+
+.btn-primary:hover {
+  background-color: var(--gold-light);
+  border-color: var(--gold-light);
+}
+
+/* ============================================
+   Art Deco Accents
+   ============================================ */
+
+.gold-text {
+  color: var(--gold-primary);
+}
+
+.gold-border {
+  border-color: var(--gold-primary);
+}
+
+.gold-bg {
+  background-color: var(--gold-primary);
+}
+
+/* Art Deco Corner Accents */
+.corner-accent {
+  position: relative;
+}
+
+.corner-accent::before,
+.corner-accent::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--gold-primary);
+}
+
+.corner-accent::before {
+  top: -2px;
+  left: -2px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.corner-accent::after {
+  bottom: -2px;
+  right: -2px;
+  border-left: none;
+  border-top: none;
+}
+
+/* Heavy Dividers */
+.divider-heavy {
+  height: 3px;
+  background-color: var(--border-primary);
+  border: none;
+}
+
+.divider-gold {
+  height: 2px;
+  background-color: var(--gold-primary);
+  border: none;
+}
+
+/* ============================================
+   Utility Classes
+   ============================================ */
+
+.text-gold {
+  color: var(--gold-primary);
+}
+
+.border-gold {
+  border-color: var(--gold-primary);
+}
+
+/* Status Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  font-size: var(--text-small);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 2px solid;
+}
+
+.badge-success {
+  background-color: rgba(40, 167, 69, 0.1);
+  border-color: #28a745;
+  color: #28a745;
+}
+
+.badge-warning {
+  background-color: rgba(255, 193, 7, 0.1);
+  border-color: #ffc107;
+  color: #ffc107;
+}
+
+.badge-error {
+  background-color: rgba(220, 53, 69, 0.1);
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+.badge-gold {
+  background-color: rgba(201, 169, 98, 0.1);
+  border-color: var(--gold-primary);
+  color: var(--gold-primary);
+}
+
+/* Safe Area Support */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 16px);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold-muted);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--gold-primary);
+  color: var(--bg-primary);
+}
+
+/* ============================================
+   Mobile Touch Targets
+   ============================================ */
+
+.touch-target {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+/* ============================================
+   Grid Pattern (Enhanced)
+   ============================================ */
+
 .grid-pattern {
-  background-color: #f0f2f5;
+  background-color: var(--bg-primary);
   background-image:
-    linear-gradient(to right, rgba(0, 0, 0, 0.08) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
-  background-size: 32px 32px;
+    repeating-linear-gradient(0deg, rgba(201, 169, 98, 0.03) 0px, transparent 1px, transparent 32px, rgba(201, 169, 98, 0.03) 33px),
+    repeating-linear-gradient(90deg, rgba(201, 169, 98, 0.03) 0px, transparent 1px, transparent 32px, rgba(201, 169, 98, 0.03) 33px);
+}
+
+.grid-pattern-dense {
+  background-size: 16px 16px;
+}
+
+/* ============================================
+   Loading States
+   ============================================ */
+
+.loading-shimmer {
+  background-color: var(--bg-card);
+  animation: shimmer 1.5s infinite;
+}
+
+/* ============================================
+   Responsive Typography
+   ============================================ */
+
+@media (min-width: 640px) {
+  :root {
+    --text-hero: 3.5rem;
+    --text-display: 2.5rem;
+    --text-title: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --text-hero: 4.5rem;
+    --text-display: 3rem;
+    --text-title: 1.75rem;
+  }
 }
