@@ -11,11 +11,35 @@ interface QRScannerProps {
 
 export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const isStoppingRef = useRef(false);
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Suppress non-critical scanner errors
+  const suppressScannerErrors = (err: any) => {
+    const errorStr = String(err);
+    // These are expected errors during cleanup, not actual failures
+    if (
+      errorStr.includes('onabort') ||
+      errorStr.includes('RenderedCameraImpl') ||
+      errorStr.includes('transition') ||
+      errorStr.includes('clear while scan is ongoing') ||
+      errorStr.includes('not running')
+    ) {
+      console.log('Suppressed expected scanner error:', errorStr);
+      return true;
+    }
+    return false;
+  };
+
   // Cleanup function that FORCEFULLY stops the camera
   const stopCamera = useCallback(async () => {
+    if (isStoppingRef.current) {
+      console.log('Already stopping camera, waiting...');
+      return;
+    }
+    
+    isStoppingRef.current = true;
     console.log('Stopping camera...');
     
     if (scannerRef.current) {
@@ -24,7 +48,9 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
         await scannerRef.current.stop();
         console.log('Camera stopped successfully');
       } catch (err) {
-        console.log('Error stopping camera (might already be stopped):', err);
+        if (!suppressScannerErrors(err)) {
+          console.log('Error stopping camera:', err);
+        }
       }
       
       try {
@@ -32,7 +58,9 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
         await scannerRef.current.clear();
         console.log('Scanner cleared');
       } catch (err) {
-        console.log('Error clearing scanner:', err);
+        if (!suppressScannerErrors(err)) {
+          console.log('Error clearing scanner:', err);
+        }
       }
       
       // Null out the reference
@@ -52,6 +80,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
         video.srcObject = null;
       }
     });
+
+    isStoppingRef.current = false;
   }, []);
 
   // Handle close button
@@ -107,7 +137,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
               handleClose();
             }
           },
-          undefined // Don't handle errors here
+          (err) => {
+            // QR scan errors - suppress expected ones
+            if (!suppressScannerErrors(err)) {
+              console.log('QR scan error:', err);
+            }
+          }
         );
 
         if (isMounted) {
@@ -116,9 +151,14 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
           await stopCamera();
         }
       } catch (err: any) {
-        console.error('Init error:', err);
+        if (!suppressScannerErrors(err)) {
+          console.error('Init error:', err);
+        }
         if (isMounted) {
-          setError(err?.message || 'Camera access denied');
+          // Only show user-friendly errors, not internal scanner errors
+          if (!suppressScannerErrors(err)) {
+            setError(err?.message || 'Camera access denied');
+          }
           setIsLoading(false);
         }
         await stopCamera();
