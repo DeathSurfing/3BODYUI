@@ -9,12 +9,18 @@ interface ThreeBodyLoaderProps {
 type AnimationPhase = 'orbit' | 'converge' | 'explode' | 'shrink' | 'finished';
 type Particle = { id: number; x: number; y: number; delay: number };
 
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
 function createParticles(): Particle[] {
   return Array.from({ length: 50 }, (_, i) => ({
     id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    delay: Math.random() * 2,
+    // Deterministic values to avoid SSR hydration mismatch.
+    x: seededRandom(i + 1) * 100,
+    y: seededRandom(i + 101) * 100,
+    delay: seededRandom(i + 201) * 2,
   }));
 }
 

@@ -2,24 +2,53 @@ import { PoolStats, Transaction } from "@/types";
 
 type JsonBody = Record<string, unknown>;
 
+function normalizeApiPath(path: string): string {
+  // Next config has trailingSlash enabled; use canonical API path
+  // to avoid redirect-related fetch issues in some runtimes.
+  if (path.startsWith("/api/") && !path.endsWith("/")) {
+    return `${path}/`;
+  }
+  return path;
+}
+
+function getFallbackPath(path: string): string | null {
+  if (!path.startsWith("/api/")) return null;
+  return path.endsWith("/") ? path.slice(0, -1) : `${path}/`;
+}
+
 async function request<TResponse>(
   path: string,
   options?: RequestInit
 ): Promise<TResponse> {
-  const response = await fetch(path, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options?.headers ?? {}),
-    },
-  });
+  const canonicalPath = normalizeApiPath(path);
+  const fallbackPath = getFallbackPath(canonicalPath);
+  const candidates = fallbackPath ? [canonicalPath, fallbackPath] : [canonicalPath];
 
-  if (!response.ok) {
-    const message = await response.text().catch(() => "Request failed");
-    throw new Error(message || `Request failed (${response.status})`);
+  let lastError: Error | null = null;
+
+  for (const candidate of candidates) {
+    try {
+      const response = await fetch(candidate, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options?.headers ?? {}),
+        },
+      });
+
+      if (!response.ok) {
+        const message = await response.text().catch(() => "Request failed");
+        lastError = new Error(message || `Request failed (${response.status})`);
+        continue;
+      }
+
+      return response.json() as Promise<TResponse>;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error("Request failed");
+    }
   }
 
-  return response.json() as Promise<TResponse>;
+  throw lastError ?? new Error("Request failed");
 }
 
 function get<TResponse>(path: string): Promise<TResponse> {

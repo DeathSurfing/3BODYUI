@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev-safe.mjs",
+    "dev:next": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
