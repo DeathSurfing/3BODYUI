@@ -48,7 +48,7 @@ export const MerchantService = {
   ): Promise<{
     status: number
     headers: Partial<X402Headers>
-    body: any
+    body: unknown
   }> {
     await new Promise(r => setTimeout(r, 1000))
 
@@ -77,7 +77,7 @@ export const MerchantService = {
     params: ExchangeParams
   ): Promise<{
     status: number
-    body: any
+    body: unknown
   }> {
     await new Promise(r => setTimeout(r, 1200))
 

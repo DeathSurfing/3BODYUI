@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { blockchainService } from '../../../services/blockchainService';
+import { apiClient } from '@/lib/api/client';
 import { Transaction, PoolStats } from '../../../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { QRCodeGenerator } from '../../QrCodeGenerator';
@@ -9,28 +9,95 @@ import { QRCodeGenerator } from '../../QrCodeGenerator';
 // Mock merchant wallet - in production this would come from connected wallet
 const MERCHANT_WALLET = "0xMerchant...789ABC";
 
+function normalizeTransactions(payload: unknown): Transaction[] {
+  if (Array.isArray(payload)) {
+    return payload as Transaction[];
+  }
+
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    Array.isArray((payload as { transactions?: unknown }).transactions)
+  ) {
+    return (payload as { transactions: Transaction[] }).transactions;
+  }
+
+  return [];
+}
+
 export const MerchantDashboard: React.FC = () => {
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [stats, setStats] = useState<PoolStats | null>(null);
   const [isQRGeneratorOpen, setIsQRGeneratorOpen] = useState(false);
+  const [error, setError] = useState('');
+  const [isPayoutProcessing, setIsPayoutProcessing] = useState(false);
+  const [payoutMessage, setPayoutMessage] = useState('');
 
   useEffect(() => {
-    const fetchData = () => {
-      setTxs(blockchainService.getTransactions());
-      setStats(blockchainService.getPoolStats());
+    let mounted = true;
+
+    const fetchData = async () => {
+      try {
+        setError('');
+        const [txResponse, exposure] = await Promise.all([
+          apiClient.listTransactions(),
+          apiClient.getLiquidityExposure(),
+        ]);
+
+        if (!mounted) return;
+
+        setTxs(normalizeTransactions(txResponse));
+        setStats(exposure);
+      } catch {
+        if (mounted) {
+          setError('Failed to fetch merchant dashboard data');
+        }
+      }
     };
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+
+    void fetchData();
+    const interval = setInterval(() => {
+      void fetchData();
+    }, 5000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const chartData = txs.slice(0, 7).reverse().map(t => ({
-    name: t.id.split('-')[1],
+    name: t.id.split('-')[1] ?? t.id.slice(-4),
     amount: t.usdAmount,
   }));
 
   const totalVolume = txs.reduce((acc, t) => acc + t.usdAmount, 0);
   const activeTxs = txs.filter(t => t.status === 'AUTHORIZED' || t.status === 'PENDING').length;
+  const totalFees = txs.reduce((acc, t) => acc + t.fee, 0);
+
+  const handleProcessPayout = async () => {
+    try {
+      setIsPayoutProcessing(true);
+      setError('');
+      setPayoutMessage('');
+
+      const payoutAmount = Number(totalFees.toFixed(4)) || 1;
+      const result = await apiClient.processMerchantPayout({
+        amount: payoutAmount,
+        currency: 'USDT',
+        transactionCount: txs.length,
+        source: 'merchant-dashboard',
+      });
+
+      setPayoutMessage(
+        `Payout ${result.status}: ${result.amount} USDT${result.txId ? ` (tx: ${result.txId})` : ''}`
+      );
+    } catch {
+      setError('Failed to process merchant payout');
+    } finally {
+      setIsPayoutProcessing(false);
+    }
+  };
 
   return (
     <div className="space-y-10">
@@ -61,8 +128,12 @@ export const MerchantDashboard: React.FC = () => {
           <button className="px-6 py-4 bg-[#111] border-[3px] border-[#333] text-sm font-mono uppercase tracking-wider hover:border-[#B87333] transition-colors">
             Export Logs
           </button>
-          <button className="px-6 py-4 bg-[#B87333] border-[3px] border-[#B87333] text-white text-sm font-mono uppercase tracking-wider hover:bg-[#CD7F32] hover:border-[#CD7F32] transition-colors">
-            Config Params
+          <button
+            onClick={handleProcessPayout}
+            disabled={isPayoutProcessing}
+            className="px-6 py-4 bg-[#B87333] border-[3px] border-[#B87333] text-white text-sm font-mono uppercase tracking-wider hover:bg-[#CD7F32] hover:border-[#CD7F32] transition-colors disabled:opacity-60"
+          >
+            {isPayoutProcessing ? 'Processing...' : 'Process Payout'}
           </button>
         </div>
       </header>
@@ -74,6 +145,18 @@ export const MerchantDashboard: React.FC = () => {
         <StatBox title="Liquidity Depth" value={`$${((stats?.totalLiquidity || 0) / 1000000).toFixed(1)}M`} />
         <StatBox title="Active Users" value="2,482" change="+142 today" />
       </div>
+
+      {error && (
+        <div className="bg-red-500/10 border-[3px] border-red-500/30 p-4 text-red-300 text-sm font-mono">
+          {error}
+        </div>
+      )}
+
+      {payoutMessage && (
+        <div className="bg-green-500/10 border-[3px] border-green-500/30 p-4 text-green-300 text-sm font-mono">
+          {payoutMessage}
+        </div>
+      )}
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">

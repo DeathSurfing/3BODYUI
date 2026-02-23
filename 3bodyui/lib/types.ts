@@ -25,7 +25,7 @@ export interface NetworkLog {
   path?: string;
   status?: number;
   headers: Record<string, string>;
-  body: any;
+  body: unknown;
   role: 'PAYEE' | 'MERCHANT' | 'SELLER';
 }
 

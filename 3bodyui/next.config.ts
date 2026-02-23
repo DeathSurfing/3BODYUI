@@ -10,7 +10,6 @@ import type { NextConfig } from "next";
  * @see https://v2.tauri.app/start/frontend/nextjs/
  */
 
-const internalHost = process.env.TAURI_DEV_HOST || 'localhost';
 const isProd = process.env.NODE_ENV === 'production';
 
 const nextConfig: NextConfig = {
@@ -58,6 +57,14 @@ const nextConfig: NextConfig = {
    * Disable x-powered-by header for security
    */
   poweredByHeader: false,
+
+  /**
+   * Force Turbopack workspace root to this app directory
+   * to avoid lockfile resolution warnings in monorepo-like setups.
+   */
+  turbopack: {
+    root: process.cwd(),
+  },
 };
 
 export default nextConfig;

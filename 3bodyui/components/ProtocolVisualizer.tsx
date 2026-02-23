@@ -24,46 +24,50 @@ const ProtocolVisualizer: React.FC<ProtocolVisualizerProps> = ({ logs }) => {
           </div>
         )}
 
-        {logs.map((log) => (
-          <div
-            key={log.id}
-            className="border border-white/20 p-4 text-[10px] font-mono"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <span className="font-bold border border-white px-1">
-                {log.type} {log.method || ""}{" "}
-                {log.status ? `[${log.status}]` : ""}
-              </span>
-              <span className="text-white/50">{log.role}</span>
-            </div>
+        {logs.map((log) => {
+          const hasBody = log.body !== null && typeof log.body !== "undefined"
 
-            {log.path && (
-              <div className="text-white/40 mb-3">{log.path}</div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <div className="text-white/30 uppercase mb-1">Headers</div>
-                {log.headers &&
-                  Object.entries(log.headers).map(([k, v]) => (
-                    <div key={k} className="flex gap-2 leading-tight">
-                      <span className="text-white/40 shrink-0">{k}:</span>
-                      <span className="text-white break-all">{v}</span>
-                    </div>
-                  ))}
+          return (
+            <div
+              key={log.id}
+              className="border border-white/20 p-4 text-[10px] font-mono"
+            >
+              <div className="flex justify-between items-start mb-2">
+                <span className="font-bold border border-white px-1">
+                  {log.type} {log.method || ""}{" "}
+                  {log.status ? `[${log.status}]` : ""}
+                </span>
+                <span className="text-white/50">{log.role}</span>
               </div>
 
-              {log.body && (
-                <div>
-                  <div className="text-white/30 uppercase mb-1">Payload</div>
-                  <pre className="text-white whitespace-pre-wrap break-all leading-tight">
-                    {JSON.stringify(log.body, null, 2)}
-                  </pre>
-                </div>
+              {log.path && (
+                <div className="text-white/40 mb-3">{log.path}</div>
               )}
+
+              <div className="space-y-4">
+                <div>
+                  <div className="text-white/30 uppercase mb-1">Headers</div>
+                  {log.headers &&
+                    Object.entries(log.headers).map(([k, v]) => (
+                      <div key={k} className="flex gap-2 leading-tight">
+                        <span className="text-white/40 shrink-0">{k}:</span>
+                        <span className="text-white break-all">{v}</span>
+                      </div>
+                    ))}
+                </div>
+
+                {hasBody && (
+                  <div>
+                    <div className="text-white/30 uppercase mb-1">Payload</div>
+                    <pre className="text-white whitespace-pre-wrap break-all leading-tight">
+                      {JSON.stringify(log.body, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

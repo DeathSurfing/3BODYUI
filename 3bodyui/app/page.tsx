@@ -81,21 +81,18 @@ const Sidebar: React.FC<SidebarProps> = ({
       role: UserRole.PAYEE,
       title: 'Payee',
       subtitle: 'Swap USD to USDT',
-      color: '#C9A962',
       icon: PayeeIcon,
     },
     {
       role: UserRole.MERCHANT,
       title: 'Merchant',
       subtitle: 'Monitor Protocol',
-      color: '#B87333',
       icon: MerchantIcon,
     },
     {
       role: UserRole.LIQUIDITY_PROVIDER,
       title: 'Liquidity Provider',
       subtitle: 'Earn Yield',
-      color: '#8B7355',
       icon: LPIcon,
     },
   ];
@@ -119,7 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Role Navigation */}
       <nav className="flex-1 py-8 px-4 md:px-6 space-y-3">
-        {roles.map(({ role, title, subtitle, color, icon: Icon }) => {
+        {roles.map(({ role, title, subtitle, icon: Icon }) => {
           const isActive = activeRole === role;
           return (
             <button

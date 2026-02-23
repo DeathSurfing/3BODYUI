@@ -1,0 +1,171 @@
+{
+  "client": "Thunder Client",
+  "collectionName": "3BODYUI API Routes",
+  "dateExported": "2026-02-23T16:30:00.000Z",
+  "version": "1.1",
+  "folders": [],
+  "requests": [
+    {
+      "_id": "a4bc64f4-1c97-47c5-8ab8-fd65003fb6a1",
+      "colId": "d3fa64dd-5b8e-4bfd-8f9b-42af40656f91",
+      "containerId": "",
+      "name": "GET Wallet Balance",
+      "url": "{{baseUrl}}/api/wallets/balance",
+      "method": "GET",
+      "sortNum": 10000,
+      "created": "2026-02-23T16:30:00.000Z",
+      "modified": "2026-02-23T16:30:00.000Z",
+      "headers": [],
+      "params": [],
+      "tests": []
+    },
+    {
+      "_id": "6853921d-0055-4542-88c3-d84ba5e70bb2",
+      "colId": "d3fa64dd-5b8e-4bfd-8f9b-42af40656f91",
+      "containerId": "",
+      "name": "POST Quote USDT-INR",
+      "url": "{{baseUrl}}/api/quotes/usdt-inr",
+      "method": "POST",
+      "sortNum": 20000,
+      "created": "2026-02-23T16:30:00.000Z",
+      "modified": "2026-02-23T16:30:00.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"amount\": 100\n}",
+        "form": []
+      },
+      "tests": []
+    },
+    {
+      "_id": "27a1799f-c9ef-4582-a746-80dafea9f57b",
+      "colId": "d3fa64dd-5b8e-4bfd-8f9b-42af40656f91",
+      "containerId": "",
+      "name": "GET Liquidity Exposure",
+      "url": "{{baseUrl}}/api/liquidity/exposure",
+      "method": "GET",
+      "sortNum": 30000,
+      "created": "2026-02-23T16:30:00.000Z",
+      "modified": "2026-02-23T16:30:00.000Z",
+      "headers": [],
+      "params": [],
+      "tests": []
+    },
+    {
+      "_id": "9b2e1e8d-84bc-435c-b3a4-44b5c90e7088",
+      "colId": "d3fa64dd-5b8e-4bfd-8f9b-42af40656f91",
+      "containerId": "",
+      "name": "POST Liquidity Deposit",
+      "url": "{{baseUrl}}/api/liquidity/deposit",
+      "method": "POST",
+      "sortNum": 40000,
+      "created": "2026-02-23T16:30:00.000Z",
+      "modified": "2026-02-23T16:30:00.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"amount\": 1000\n}",
+        "form": []
+      },
+      "tests": []
+    },
+    {
+      "_id": "f4b57e72-5478-471f-b4a2-f5e8a357e4af",
+      "colId": "d3fa64dd-5b8e-4bfd-8f9b-42af40656f91",
+      "containerId": "",
+      "name": "GET Transactions List",
+      "url": "{{baseUrl}}/api/transactions/list",
+      "method": "GET",
+      "sortNum": 50000,
+      "created": "2026-02-23T16:30:00.000Z",
+      "modified": "2026-02-23T16:30:00.000Z",
+      "headers": [],
+      "params": [],
+      "tests": []
+    },
+    {
+      "_id": "e884726e-4063-4467-bf65-fdd3be01d32a",
+      "colId": "d3fa64dd-5b8e-4bfd-8f9b-42af40656f91",
+      "containerId": "",
+      "name": "POST Transactions Create",
+      "url": "{{baseUrl}}/api/transactions/create",
+      "method": "POST",
+      "sortNum": 60000,
+      "created": "2026-02-23T16:30:00.000Z",
+      "modified": "2026-02-23T16:30:00.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"payeeAddress\": \"{{payeeAddress}}\",\n  \"usdAmount\": 150,\n  \"orderId\": \"ORD-THUNDER-001\",\n  \"merchantWallet\": \"{{merchantWallet}}\",\n  \"source\": \"thunder-client\"\n}",
+        "form": []
+      },
+      "tests": []
+    },
+    {
+      "_id": "5a32d7e2-12a5-4f6d-b2bc-95fabdb44cf6",
+      "colId": "d3fa64dd-5b8e-4bfd-8f9b-42af40656f91",
+      "containerId": "",
+      "name": "POST Transactions Execute",
+      "url": "{{baseUrl}}/api/transactions/execute",
+      "method": "POST",
+      "sortNum": 70000,
+      "created": "2026-02-23T16:30:00.000Z",
+      "modified": "2026-02-23T16:30:00.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"transactionId\": \"TX-002\",\n  \"lpAddress\": \"{{lpAddress}}\",\n  \"proof\": \"upi_txn_mock_001\"\n}",
+        "form": []
+      },
+      "tests": []
+    },
+    {
+      "_id": "520eff84-8f2b-4c80-9cf7-c7a294f194f4",
+      "colId": "d3fa64dd-5b8e-4bfd-8f9b-42af40656f91",
+      "containerId": "",
+      "name": "POST Merchants Payout",
+      "url": "{{baseUrl}}/api/merchants/payout",
+      "method": "POST",
+      "sortNum": 80000,
+      "created": "2026-02-23T16:30:00.000Z",
+      "modified": "2026-02-23T16:30:00.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"amount\": 25.5,\n  \"currency\": \"USDT\",\n  \"transactionCount\": 2,\n  \"source\": \"thunder-client\"\n}",
+        "form": []
+      },
+      "tests": []
+    }
+  ]
+}

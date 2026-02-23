@@ -7,21 +7,22 @@ interface ThreeBodyLoaderProps {
 }
 
 type AnimationPhase = 'orbit' | 'converge' | 'explode' | 'shrink' | 'finished';
+type Particle = { id: number; x: number; y: number; delay: number };
+
+function createParticles(): Particle[] {
+  return Array.from({ length: 50 }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    delay: Math.random() * 2,
+  }));
+}
 
 export const ThreeBodyLoader: React.FC<ThreeBodyLoaderProps> = ({ onComplete }) => {
   const [phase, setPhase] = useState<AnimationPhase>('orbit');
-  const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; delay: number }>>([]);
+  const [particles] = useState<Particle[]>(() => createParticles());
 
   useEffect(() => {
-    // Generate background particles
-    const newParticles = Array.from({ length: 50 }, (_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      delay: Math.random() * 2,
-    }));
-    setParticles(newParticles);
-
     // Animation timeline
     const t1 = setTimeout(() => setPhase('converge'), 3000);
     const t2 = setTimeout(() => setPhase('explode'), 4000);

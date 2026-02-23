@@ -50,7 +50,6 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
 
   useEffect(() => {
     if (!isOpen) {
-      stopScanning();
       return;
     }
 

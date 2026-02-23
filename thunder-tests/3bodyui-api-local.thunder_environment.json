@@ -1,0 +1,24 @@
+{
+  "client": "Thunder Client",
+  "environmentName": "3BODYUI Local",
+  "dateExported": "2026-02-23T16:30:00.000Z",
+  "version": "1.0",
+  "variables": [
+    {
+      "name": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "name": "payeeAddress",
+      "value": "0x3B0D...Y789"
+    },
+    {
+      "name": "merchantWallet",
+      "value": "0xMerchant...789ABC"
+    },
+    {
+      "name": "lpAddress",
+      "value": "0xLP42...E123"
+    }
+  ]
+}

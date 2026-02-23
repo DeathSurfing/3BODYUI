@@ -1,37 +1,93 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { blockchainService } from '../../../services/blockchainService';
+import { apiClient } from '@/lib/api/client';
 import { Transaction, PoolStats, TransactionStatus } from '../../../types';
 import { MOCK_LP_ADDRESS } from '../../../constants';
+
+function normalizeTransactions(payload: unknown): Transaction[] {
+  if (Array.isArray(payload)) {
+    return payload as Transaction[];
+  }
+
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    Array.isArray((payload as { transactions?: unknown }).transactions)
+  ) {
+    return (payload as { transactions: Transaction[] }).transactions;
+  }
+
+  return [];
+}
 
 export const LPDashboard: React.FC = () => {
   const [stats, setStats] = useState<PoolStats | null>(null);
   const [pendingRequests, setPendingRequests] = useState<Transaction[]>([]);
   const [depositAmount, setDepositAmount] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const refresh = () => {
-    setStats(blockchainService.getPoolStats());
-    setPendingRequests(blockchainService.getTransactions().filter(t => t.status === TransactionStatus.AUTHORIZED));
+  const refresh = async () => {
+    try {
+      setError('');
+
+      const [exposure, txResponse] = await Promise.all([
+        apiClient.getLiquidityExposure(),
+        apiClient.listTransactions(),
+      ]);
+
+      const txs = normalizeTransactions(txResponse);
+      setStats(exposure);
+      setPendingRequests(
+        txs.filter(
+          (t) =>
+            t.status === TransactionStatus.AUTHORIZED ||
+            t.status === TransactionStatus.HTTP_402_REQUIRED
+        )
+      );
+    } catch {
+      setError('Failed to load liquidity provider data');
+    }
   };
 
   useEffect(() => {
-    refresh();
-    const interval = setInterval(refresh, 3000);
+    void refresh();
+    const interval = setInterval(() => {
+      void refresh();
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  const handleDeposit = () => {
+  const handleDeposit = async () => {
     const val = parseFloat(depositAmount);
     if (isNaN(val) || val <= 0) return;
-    blockchainService.addLiquidity(val);
-    setDepositAmount('');
-    refresh();
+
+    setIsSubmitting(true);
+    try {
+      await apiClient.depositLiquidity({ amount: val });
+      setDepositAmount('');
+      await refresh();
+    } catch {
+      setError('Failed to submit deposit');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleFulfill = (id: string) => {
-    blockchainService.fulfillRequest(id, MOCK_LP_ADDRESS);
-    refresh();
+  const handleFulfill = async (id: string) => {
+    setIsSubmitting(true);
+    try {
+      await apiClient.executeTransaction({
+        transactionId: id,
+        lpAddress: MOCK_LP_ADDRESS,
+      });
+      await refresh();
+    } catch {
+      setError('Failed to fulfill transaction');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -96,7 +152,8 @@ export const LPDashboard: React.FC = () => {
                   />
                   <button 
                     onClick={handleDeposit}
-                    className="absolute right-2 top-2 bottom-2 px-6 bg-[#8B7355] text-white text-sm font-bold uppercase border-[3px] border-[#8B7355] hover:bg-[#C9A962] hover:border-[#C9A962] transition-colors"
+                    disabled={isSubmitting}
+                    className="absolute right-2 top-2 bottom-2 px-6 bg-[#8B7355] text-white text-sm font-bold uppercase border-[3px] border-[#8B7355] hover:bg-[#C9A962] hover:border-[#C9A962] transition-colors disabled:opacity-60"
                   >
                     Deposit
                   </button>
@@ -132,6 +189,12 @@ export const LPDashboard: React.FC = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {error && (
+              <div className="col-span-2 bg-red-500/10 border-[3px] border-red-500/30 p-4 text-red-300 text-sm font-mono">
+                {error}
+              </div>
+            )}
+
             {pendingRequests.length === 0 && (
               <div className="col-span-2 py-20 bg-[#111] border-[3px] border-[#333] border-dashed text-center">
                 <SearchIcon className="w-16 h-16 mx-auto mb-6 text-[#333]" />
@@ -159,7 +222,8 @@ export const LPDashboard: React.FC = () => {
 
                 <button 
                   onClick={() => handleFulfill(req.id)}
-                  className="w-full py-5 bg-[#222] text-white font-display font-bold text-base uppercase tracking-wider border-[3px] border-[#333] hover:bg-[#8B7355] hover:border-[#8B7355] transition-all"
+                  disabled={isSubmitting}
+                  className="w-full py-5 bg-[#222] text-white font-display font-bold text-base uppercase tracking-wider border-[3px] border-[#333] hover:bg-[#8B7355] hover:border-[#8B7355] transition-all disabled:opacity-60"
                 >
                   Fulfill Transaction
                 </button>

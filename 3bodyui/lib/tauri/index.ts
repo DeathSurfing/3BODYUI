@@ -33,6 +33,10 @@ export { notifications } from './notifications';
 export { appInfo } from './app';
 export { external } from './shell';
 
+type TauriWindow = Window & {
+  __TAURI__?: unknown;
+};
+
 /**
  * Check if the app is running inside Tauri
  * 
@@ -54,7 +58,7 @@ export { external } from './shell';
  */
 export function isTauri(): boolean {
   return typeof window !== 'undefined' && 
-         (window as any).__TAURI__ !== undefined;
+         (window as TauriWindow).__TAURI__ !== undefined;
 }
 
 /**

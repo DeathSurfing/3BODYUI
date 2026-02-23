@@ -32,7 +32,7 @@ export async function internalFetch<T>(
     }
 
     return response.json();
-  } catch (error) {
+  } catch {
     // During static export, backend won't be available
     // Return mock data for build purposes
     console.warn(`Backend unavailable, returning mock data for ${path}`);
@@ -57,8 +57,12 @@ function generateMockResponse<T>(path: string): T {
   
   if (path.includes('/quotes/usdt-inr')) {
     return {
-      rate: 0.99,
-      timestamp: Date.now()
+      rate: 83.15,
+      usdtPriceInInr: 83.15,
+      usdtPriceInUsd: 1.0,
+      priceChange24h: 0.12,
+      timestamp: Date.now(),
+      lastUpdated: new Date().toISOString(),
     } as T;
   }
   
@@ -66,6 +70,32 @@ function generateMockResponse<T>(path: string): T {
     return {
       usd: 1000,
       usdt: 500
+    } as T;
+  }
+
+  if (path.includes('/transactions/list')) {
+    return {
+      transactions: [
+        {
+          id: 'TX-001',
+          payeeAddress: '0xAlice...123',
+          usdAmount: 500,
+          usdtAmount: 500,
+          fee: 0.05,
+          status: 'FULFILLED',
+          timestamp: Date.now() - 3600000,
+          lpAddress: '0xLP...456',
+        },
+        {
+          id: 'TX-002',
+          payeeAddress: '0xBob...789',
+          usdAmount: 1200,
+          usdtAmount: 1200,
+          fee: 0.12,
+          status: 'AUTHORIZED',
+          timestamp: Date.now() - 1800000,
+        },
+      ],
     } as T;
   }
   
@@ -87,6 +117,13 @@ function generateMockResponse<T>(path: string): T {
     return {
       status: 'COMPLETED',
       amount: 1000
+    } as T;
+  }
+
+  if (path.includes('/liquidity/deposit')) {
+    return {
+      status: 'ACCEPTED',
+      amount: 0,
     } as T;
   }
   

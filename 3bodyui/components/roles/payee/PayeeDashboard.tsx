@@ -1,12 +1,29 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { apiClient, UsdtInrQuoteResponse } from '@/lib/api/client';
+import { MOCK_WALLET_ADDRESS } from '@/constants';
 import { QRScanner } from '../../QRScanner';
-import { priceService, PriceData } from '../../../services/priceService';
+
+interface PriceData {
+  usdtPriceInInr: number;
+  usdtPriceInUsd: number;
+  priceChange24h: number;
+  lastUpdated: Date;
+}
+
+function normalizeQuote(quote: UsdtInrQuoteResponse): PriceData {
+  const inrRate = quote.usdtPriceInInr ?? quote.rate ?? 83.15;
+  return {
+    usdtPriceInInr: inrRate,
+    usdtPriceInUsd: quote.usdtPriceInUsd ?? 1,
+    priceChange24h: quote.priceChange24h ?? 0,
+    lastUpdated: quote.lastUpdated ? new Date(quote.lastUpdated) : new Date(),
+  };
+}
 
 export const PayeeDashboard: React.FC = () => {
-  // Mock USDT balance - in production this would come from the wallet
-  const [usdtBalance] = useState<number>(1234.56);
+  const [usdtBalance, setUsdtBalance] = useState<number>(0);
   
   // Price data state
   const [priceData, setPriceData] = useState<PriceData | null>(null);
@@ -20,16 +37,22 @@ export const PayeeDashboard: React.FC = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannedData, setScannedData] = useState<string>('');
 
-  // Fetch price data
-  const fetchPrice = useCallback(async () => {
+  // Fetch wallet + quote data from API routes
+  const fetchDashboardData = useCallback(async () => {
     try {
       setIsLoading(true);
       setError('');
-      const data = await priceService.fetchUSDTPrice();
-      setPriceData(data);
+
+      const [wallet, quote] = await Promise.all([
+        apiClient.getWalletBalance(),
+        apiClient.getUsdtInrQuote(1),
+      ]);
+
+      setUsdtBalance(wallet.usdt ?? 0);
+      setPriceData(normalizeQuote(quote));
       setCountdown(30); // Reset countdown
-    } catch (err) {
-      setError('Failed to fetch price data');
+    } catch {
+      setError('Failed to fetch wallet/price data');
     } finally {
       setIsLoading(false);
     }
@@ -37,13 +60,15 @@ export const PayeeDashboard: React.FC = () => {
 
   // Initial fetch and auto-refresh
   useEffect(() => {
-    fetchPrice();
+    void fetchDashboardData();
     
     // Auto-refresh every 30 seconds
-    const priceInterval = setInterval(fetchPrice, 30000);
+    const priceInterval = setInterval(() => {
+      void fetchDashboardData();
+    }, 30000);
     
     return () => clearInterval(priceInterval);
-  }, [fetchPrice]);
+  }, [fetchDashboardData]);
 
   // Countdown timer
   useEffect(() => {
@@ -55,10 +80,36 @@ export const PayeeDashboard: React.FC = () => {
   }, []);
 
   // Handle QR scan
-  const handleScan = (data: string) => {
+  const handleScan = async (data: string) => {
     setScannedData(data);
-    // Here you would parse the QR data and initiate payment
-    alert(`Scanned: ${data}\n\nIn production, this would parse merchant payment details and show a confirmation screen.`);
+
+    try {
+      const parsed = JSON.parse(data) as {
+        data?: {
+          amount?: string;
+          orderId?: string;
+          merchantWallet?: string;
+        };
+      };
+
+      const usdAmount = Number(parsed?.data?.amount);
+      if (!Number.isFinite(usdAmount) || usdAmount <= 0) {
+        throw new Error('Invalid amount in QR');
+      }
+
+      const created = await apiClient.createTransaction({
+        payeeAddress: MOCK_WALLET_ADDRESS,
+        usdAmount,
+        orderId: parsed?.data?.orderId,
+        merchantWallet: parsed?.data?.merchantWallet,
+        source: 'qr-scan',
+      });
+
+      alert(`Payment request created.\nID: ${created.id}\nStatus: ${created.status}`);
+      await fetchDashboardData();
+    } catch {
+      alert('Invalid QR payload. Expected 3 Body payment QR JSON format.');
+    }
   };
 
   // Calculate portfolio values
@@ -119,7 +170,7 @@ export const PayeeDashboard: React.FC = () => {
           </div>
           <div className="w-[2px] h-10 bg-[#333]" />
           <button
-            onClick={fetchPrice}
+            onClick={fetchDashboardData}
             disabled={isLoading}
             className="p-3 border-[3px] border-[#333] hover:border-[#C9A962] disabled:opacity-50 transition-colors"
           >
@@ -214,11 +265,18 @@ export const PayeeDashboard: React.FC = () => {
           <AlertIcon className="w-5 h-5 text-red-500" />
           <span className="text-red-400 text-sm">{error}</span>
           <button
-            onClick={fetchPrice}
+            onClick={fetchDashboardData}
             className="ml-auto text-xs font-mono uppercase text-red-400 hover:text-red-300"
           >
             Retry
           </button>
+        </div>
+      )}
+
+      {scannedData && (
+        <div className="bg-[#111] border-[3px] border-[#333] p-4">
+          <span className="text-xs font-mono uppercase text-[#666] block mb-2">Last Scanned Payload</span>
+          <p className="font-mono text-xs text-[#888] break-all">{scannedData}</p>
         </div>
       )}
     </div>
