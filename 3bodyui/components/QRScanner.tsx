@@ -38,9 +38,9 @@ export const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, onScan })
 
     try {
       const result = await QrScanner.scanImage(video);
-      if (result && result.data) {
+      if (result) {
         stopScanning();
-        onScan(result.data);
+        onScan(result);
         handleClose();
       }
     } catch {
